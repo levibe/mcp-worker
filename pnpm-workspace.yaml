@@ -1,15 +1,19 @@
 # pnpm reads its settings from this file. An equivalent "pnpm" block in
 # package.json is silently ignored, so settings belong here.
 
-# Minutes — 10080 is 7 days. pnpm already waits 1 day by default; this widens
-# that window, since compromised releases are usually caught and pulled within
-# hours. `pnpm install --trust-lockfile` skips the check, but it trusts every
-# entry at once, so the targeted exclusion below is preferred.
+# Minutes — 10080 is 7 days. Under the pnpm 10 this repo pins, this value is the
+# whole window: 10's cooldown only exists once the key is set, where pnpm 11
+# waits 1 day by default. Widened either way, since compromised releases are
+# usually caught and pulled within hours. `pnpm install --trust-lockfile` skips
+# the check, but it trusts every entry at once, so the targeted exclusion below
+# is preferred.
 minimumReleaseAge: 10080
 
-# pnpm turns this on by default once minimumReleaseAge is set explicitly. Stated
-# here so the behaviour is visible: when no version satisfies the window, the
-# install fails rather than quietly falling back to one that doesn't.
+# Inert under the pnpm 10 this repo pins, which knows only the two keys above
+# and below and ignores unknown keys silently. Kept deliberately for the day
+# packageManager moves to pnpm 11 (zendesk-mcp-cloudflare already has): there it
+# makes the install fail when no version satisfies the window, rather than
+# quietly falling back to one that doesn't.
 minimumReleaseAgeStrict: true
 
 # Pinned to the exact version rather than the bare package name, which would
@@ -46,9 +50,10 @@ minimumReleaseAgeExclude:
   - '@modelcontextprotocol/sdk@1.30.0'
   - 'agents@0.20.1'
 
-# pnpm fails the install outright (ERR_PNPM_IGNORED_BUILDS) unless every
-# package with an install script is answered here. esbuild arrives with vitest
-# and fetches a prebuilt platform binary.
+# pnpm 11 fails the install outright (ERR_PNPM_IGNORED_BUILDS) unless every
+# package with an install script is answered here; the pnpm 10 this repo pins
+# skips unanswered scripts with a warning instead, so the answers matter on
+# both. esbuild arrives with vitest and fetches a prebuilt platform binary.
 #
 # core-js-pure is denied rather than permitted, and it is the one entry here
 # that is not a build at all: its postinstall prints a funding notice and

@@ -16,6 +16,7 @@
 			"types": "./dist/index.d.ts",
 			"import": "./dist/index.js"
 		},
+		"./package.json": "./package.json",
 		"./registry": {
 			"types": "./dist/registry/index.d.ts",
 			"import": "./dist/registry/index.js"
@@ -30,7 +31,7 @@
 		}
 	},
 	"scripts": {
-		"build": "tsc -p tsconfig.build.json && ts-add-js-extension --dir=dist",
+		"build": "rm -rf dist && tsc -p tsconfig.build.json && ts-add-js-extension --dir=dist",
 		"prepare": "pnpm build",
 		"type-check": "tsc --noEmit",
 		"lint": "eslint src/",
