@@ -18,8 +18,7 @@
  * target to climb. Raise one when real coverage lands. Say so in the commit when
  * you lower one, because that is coverage being given up.
  *
- * What carries no pin is deliberate too: the vendored OAuth helper's
- * `parseRedirectApproval` has no direct test yet, `require-changes` and the
+ * What carries no pin is deliberate too: `require-changes` and the
  * upstream-OAuth helpers are covered through their consumers in the apps built
  * on this package, and the barrels have nothing to decide. They all stay in the
  * denominator so the holes are visible, per the coverage.include comment in
@@ -73,6 +72,14 @@ export const coverageThresholds = {
 	// one-line delegation that the zendesk client's integration tests drive and this package's
 	// transport suite does not reach on its own — measured 92 at the lift.
 	'src/http/http-client.ts': { branches: 90, functions: 92 },
+	// The vendored approval module carries the one deliberate divergence from its original —
+	// a non-string clientId is refused rather than written into a cookie whose own reader
+	// then discards it wholesale, prior approvals included (#6) — and the tests naming that
+	// argument are what these numbers keep alive: the four-clause guard in
+	// parseRedirectApproval and the all-strings branch in the cookie read. Measured
+	// 80/74/83 (statements/branches/functions) when those tests landed; the uncovered
+	// remainder is the parked _encodeState and error arms nothing well-formed constructs.
+	'src/oauth/workers-oauth-utils.ts': { statements: 79, branches: 72, functions: 83 },
 	// It pins 100 on branches, which it could not do while the "what did this throw" ternary
 	// was written out at each of five catch sites: `atob`, `JSON.parse` and `btoa` all throw
 	// real Errors, so four of those five pairs had an arm nothing could reach. Behind one

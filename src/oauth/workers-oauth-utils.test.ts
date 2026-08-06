@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ClientInfo } from '@cloudflare/workers-oauth-provider'
-import { decodeBase64Json, encodeBase64Utf8 } from './base64'
-import { clientIdAlreadyApproved, renderApprovalDialog } from './workers-oauth-utils'
+import { decodeBase64Json, decodeBase64Utf8, encodeBase64Json, encodeBase64Utf8 } from './base64'
+import {
+	clientIdAlreadyApproved,
+	parseRedirectApproval,
+	renderApprovalDialog,
+} from './workers-oauth-utils'
 
 const COOKIE_NAME = 'mcp-approved-clients'
 const SECRET = 'test-cookie-secret'
@@ -18,7 +22,7 @@ const SECRET = 'test-cookie-secret'
  * cookie in the format the retired encoder wrote, which the read path has to keep honouring.
  */
 const signedCookie = async (
-	approvedClients: string[],
+	approvedClients: unknown[],
 	encode: (payload: string) => string = encodeBase64Utf8
 ): Promise<string> => {
 	const payload = JSON.stringify(approvedClients)
@@ -122,6 +126,18 @@ describe('clientIdAlreadyApproved', () => {
 
 		await expect(clientIdAlreadyApproved(request, 'client-a', SECRET)).resolves.toBe(false)
 	})
+
+	// The signature verifies here — the poison is the payload. One non-string in the list makes
+	// the reader discard the whole cookie, prior approvals included, and this branch is why
+	// parseRedirectApproval refuses a non-string clientId instead of writing one (#6): a value
+	// this check would reject must never get into the list in the first place.
+	it('approves nobody from a correctly signed cookie whose payload holds a non-string', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+		const request = requestWithCookie(await signedCookie(['client-a', 5]))
+
+		await expect(clientIdAlreadyApproved(request, 'client-a', SECRET)).resolves.toBe(false)
+		expect(warn).toHaveBeenCalledWith('Cookie payload contains non-string elements.')
+	})
 })
 
 // #3. These fields are rendered into `href` and `src` attributes. `sanitizeHtml` escapes
@@ -209,5 +225,52 @@ describe('renderApprovalDialog state encoding', () => {
 		const encoded = html.match(/name="state" value="([^"]+)"/)![1]
 
 		expect(decodeBase64Json(encoded)).toEqual(state)
+	})
+})
+
+/** The POST /authorize form submission exactly as the approval dialog produces it. */
+const approvalRequest = (state: unknown): Request =>
+	new Request('https://example.com/authorize', {
+		method: 'POST',
+		body: new URLSearchParams({ state: encodeBase64Json(state) }),
+	})
+
+describe('parseRedirectApproval', () => {
+	// #6 pins the one deliberate divergence from the vendored original, which accepted any
+	// truthy clientId here. A non-string one is not odd-but-usable, it is poison: it would be
+	// written into the approval list, and getApprovedClientsFromCookie discards any list
+	// holding a non-string — so the next /authorize throws away the whole cookie, prior
+	// approvals included, and the user is back at the dialog with nothing saying why.
+	// Reverting the guard to a truthiness check has to come through this test.
+	it('refuses a state whose clientId is a truthy non-string', async () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+		await expect(
+			parseRedirectApproval(approvalRequest({ oauthReqInfo: { clientId: 5 } }), SECRET)
+		).rejects.toThrow(
+			'Failed to parse approval form: Could not extract clientId from state object.'
+		)
+		expect(error).toHaveBeenCalledWith('Error processing form submission:', expect.any(Error))
+	})
+
+	// The wording is the vendored original's, byte for byte — consumers may match on it, so
+	// the typed narrowing had to keep every malformed shape landing on this same sentence.
+	it('refuses a state that decodes to null with the original message', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {})
+
+		await expect(parseRedirectApproval(approvalRequest(null), SECRET)).rejects.toThrow(
+			'Failed to parse approval form: Could not extract clientId from state object.'
+		)
+	})
+
+	it('signs the approved clientId into the Set-Cookie and hands the state back', async () => {
+		const state = { oauthReqInfo: { clientId: 'client-a' } }
+
+		const result = await parseRedirectApproval(approvalRequest(state), SECRET)
+
+		expect(result.state).toEqual(state)
+		const cookie = result.headers['Set-Cookie']
+		const value = cookie.match(new RegExp(`${COOKIE_NAME}=([^;]+)`))![1]
+		expect(JSON.parse(decodeBase64Utf8(value.split('.')[1]))).toEqual(['client-a'])
 	})
 })
