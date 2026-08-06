@@ -1,11 +1,14 @@
 // workers-oauth-utils.ts
 
-import type { AuthRequest, ClientInfo } from '@cloudflare/workers-oauth-provider' // Adjust path if necessary
+import type { ClientInfo } from '@cloudflare/workers-oauth-provider' // Adjust path if necessary
 
-// Local edit to this vendored file: every base64 round-trip goes through the UTF-8 helpers,
-// because bare btoa throws on any code point above U+00FF and these payloads carry callers'
-// own text. Keep the swaps if this file is refreshed from upstream.
+// Local edits to this vendored file, to keep if it is ever refreshed from upstream: every
+// base64 round-trip goes through the UTF-8 helpers, because bare btoa throws on any code point
+// above U+00FF and these payloads carry callers' own text; and the module is typed by narrowing
+// from `unknown` rather than upstream's `any`s, so it holds the same `no-explicit-any: error`
+// as the rest of the package.
 import { decodeBase64Json, decodeBase64Utf8, encodeBase64Json, encodeBase64Utf8 } from './base64'
+import { isRecord } from './narrow'
 
 const COOKIE_NAME = 'mcp-approved-clients'
 const ONE_YEAR_IN_SECONDS = 31536000
@@ -17,7 +20,7 @@ const ONE_YEAR_IN_SECONDS = 31536000
  * @param data - The data to encode (will be stringified).
  * @returns A URL-safe base64 encoded string.
  */
-function _encodeState(data: any): string {
+function _encodeState(data: unknown): string {
 	try {
 		return encodeBase64Json(data)
 	} catch (e) {
@@ -29,11 +32,12 @@ function _encodeState(data: any): string {
 /**
  * Decodes a URL-safe base64 string back to its original data.
  * @param encoded - The URL-safe base64 encoded string.
- * @returns The original data.
+ * @returns The original data, `unknown` because the JSON said whatever it said — the caller
+ * narrows.
  */
-function decodeState<T = any>(encoded: string): T {
+function decodeState(encoded: string): unknown {
 	try {
-		return decodeBase64Json(encoded) as T
+		return decodeBase64Json(encoded)
 	} catch (e) {
 		console.error('Error decoding state:', e)
 		throw new Error('Could not decode state')
@@ -160,17 +164,17 @@ async function getApprovedClientsFromCookie(
 	}
 
 	try {
-		const approvedClients = JSON.parse(payload)
+		const approvedClients: unknown = JSON.parse(payload)
 		if (!Array.isArray(approvedClients)) {
 			console.warn('Cookie payload is not an array.')
 			return null // Payload isn't an array
 		}
 		// Ensure all elements are strings
-		if (!approvedClients.every((item) => typeof item === 'string')) {
+		if (!approvedClients.every((item): item is string => typeof item === 'string')) {
 			console.warn('Cookie payload contains non-string elements.')
 			return null
 		}
-		return approvedClients as string[]
+		return approvedClients
 	} catch (e) {
 		console.error('Error parsing cookie payload:', e)
 		return null // JSON parsing failed
@@ -220,7 +224,7 @@ export interface ApprovalDialogOptions {
 	 * Arbitrary state data to pass through the approval flow
 	 * Will be encoded in the form and returned when approval is complete
 	 */
-	state: Record<string, any>
+	state: Record<string, unknown>
 }
 
 /**
@@ -563,8 +567,13 @@ export function renderApprovalDialog(request: Request, options: ApprovalDialogOp
  * Result of parsing the approval form submission.
  */
 export interface ParsedApprovalResult {
-	/** The original state object passed through the form. */
-	state: any
+	/**
+	 * The original state object passed through the form. It arrived through a form body, and
+	 * the parse checked `oauthReqInfo.clientId` and nothing else — hence `unknown`: everything
+	 * else in here is still the submitter's claim, and the caller narrows or casts with that
+	 * said, the way `/callback` does for its own state.
+	 */
+	state: { oauthReqInfo?: unknown }
 	/** Headers to set on the redirect response, including the Set-Cookie header. */
 	headers: Record<string, string>
 }
@@ -586,8 +595,8 @@ export async function parseRedirectApproval(
 		throw new Error('Invalid request method. Expected POST.')
 	}
 
-	let state: any
-	let clientId: string | undefined
+	let state: { oauthReqInfo?: unknown }
+	let clientId: string
 
 	try {
 		const formData = await request.formData()
@@ -597,12 +606,23 @@ export async function parseRedirectApproval(
 			throw new Error("Missing or invalid 'state' in form data.")
 		}
 
-		state = decodeState<{ oauthReqInfo?: AuthRequest }>(encodedState) // Decode the state
-		clientId = state?.oauthReqInfo?.clientId // Extract clientId from within the state
+		const decoded = decodeState(encodedState)
 
-		if (!clientId) {
+		// Narrowed the way /callback narrows its own state, and to a string deliberately: this
+		// clientId joins the approval list, and getApprovedClientsFromCookie refuses any list
+		// holding a non-string — so a state whose clientId were some other truthy JSON value
+		// would mint a cookie its own reader discards, taking every prior approval with it.
+		if (
+			!isRecord(decoded) ||
+			!isRecord(decoded.oauthReqInfo) ||
+			typeof decoded.oauthReqInfo.clientId !== 'string' ||
+			!decoded.oauthReqInfo.clientId
+		) {
 			throw new Error('Could not extract clientId from state object.')
 		}
+
+		state = decoded
+		clientId = decoded.oauthReqInfo.clientId
 	} catch (e) {
 		console.error('Error processing form submission:', e)
 		// Rethrow or handle as appropriate, maybe return a specific error response
