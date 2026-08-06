@@ -136,11 +136,13 @@ export const createGoogleHandler = (options: GoogleHandlerOptions) => {
 			return c.text('Invalid request', 400)
 		}
 
-		// The same statement /callback makes with its own cast below, not a claim the shape has
-		// been established: parseRedirectApproval checked `oauthReqInfo.clientId` and nothing
-		// else, so the rest of this object is the form's claim. It rides to Google as opaque
-		// state and is re-checked on the way back, where /callback narrows it again and the
-		// provider validates the fields that matter.
+		// Not a claim the shape has been established: parseRedirectApproval checked
+		// `oauthReqInfo.clientId` and nothing else, so the rest of this object is the form's
+		// claim. It is also a deliberately weaker statement than the cast /callback makes below —
+		// that value is read field by field inside completeAuthorization, while this one is only
+		// ever spread into encodeBase64Json, riding to Google as opaque state and re-checked on
+		// the way back, where /callback narrows it again and the provider validates the fields
+		// that matter.
 		return redirectToGoogle(c, state.oauthReqInfo as AuthRequest, headers)
 	})
 

@@ -223,8 +223,13 @@ export interface ApprovalDialogOptions {
 	/**
 	 * Arbitrary state data to pass through the approval flow
 	 * Will be encoded in the form and returned when approval is complete
+	 *
+	 * `object` rather than `Record<string, unknown>` because the value only ever reaches
+	 * `encodeBase64Json`, so "some object" is the entire real constraint — and interfaces
+	 * carry no implicit index signature, so the `Record` type would refuse interface-typed
+	 * values the `any`-typed field always accepted.
 	 */
-	state: Record<string, unknown>
+	state: object
 }
 
 /**
@@ -568,12 +573,13 @@ export function renderApprovalDialog(request: Request, options: ApprovalDialogOp
  */
 export interface ParsedApprovalResult {
 	/**
-	 * The original state object passed through the form. It arrived through a form body, and
-	 * the parse checked `oauthReqInfo.clientId` and nothing else — hence `unknown`: everything
-	 * else in here is still the submitter's claim, and the caller narrows or casts with that
-	 * said, the way `/callback` does for its own state.
+	 * The original state object passed through the form — the whole record, so whatever a
+	 * caller put beside `oauthReqInfo` on the way in is readable on the way back. It arrived
+	 * through a form body, and the parse checked `oauthReqInfo.clientId` and nothing else —
+	 * hence every value `unknown`: the rest is still the submitter's claim, and the caller
+	 * narrows or casts with that said, the way `/callback` does for its own state.
 	 */
-	state: { oauthReqInfo?: unknown }
+	state: Record<string, unknown> & { oauthReqInfo?: unknown }
 	/** Headers to set on the redirect response, including the Set-Cookie header. */
 	headers: Record<string, string>
 }
@@ -595,7 +601,7 @@ export async function parseRedirectApproval(
 		throw new Error('Invalid request method. Expected POST.')
 	}
 
-	let state: { oauthReqInfo?: unknown }
+	let state: Record<string, unknown> & { oauthReqInfo?: unknown }
 	let clientId: string
 
 	try {
