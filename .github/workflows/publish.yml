@@ -1,0 +1,52 @@
+name: Publish
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # Reads the pinned version from the packageManager field in package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # GITHUB_TOKEN carries packages: write for this repo, which is all the
+      # publish below needs; the same value also satisfies the committed
+      # .npmrc's ${GITHUB_PACKAGES_TOKEN} reference at install time.
+      - run: pnpm install --frozen-lockfile
+        env:
+          GITHUB_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # The tag names the release and package.json names the artifact, and
+      # publishing an artifact that disagrees with its tag is how a version
+      # becomes unfindable later. Fail here rather than discover it on install.
+      - name: Validate version
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          RELEASE_VERSION=${GITHUB_REF#refs/tags/v}
+          if [ "$PACKAGE_VERSION" != "$RELEASE_VERSION" ]; then
+            echo "::error::Package version ($PACKAGE_VERSION) doesn't match release tag (v$RELEASE_VERSION)"
+            exit 1
+          fi
+
+      # prepublishOnly runs the full validate chain before anything uploads.
+      - name: Publish to GitHub Packages
+        run: pnpm publish --no-git-checks
+        env:
+          GITHUB_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}

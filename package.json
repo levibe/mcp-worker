@@ -1,0 +1,105 @@
+{
+	"name": "@levibe/mcp-worker",
+	"version": "0.0.0",
+	"packageManager": "pnpm@10.32.1",
+	"type": "module",
+	"description": "Shared MCP server infrastructure for Cloudflare Workers: tool registry with reach-level ceilings, a retrying fetch transport, and Google OAuth for MCP clients",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"files": [
+		"dist",
+		"LICENSE",
+		"README.md"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./registry": {
+			"types": "./dist/registry/index.d.ts",
+			"import": "./dist/registry/index.js"
+		},
+		"./http": {
+			"types": "./dist/http/index.d.ts",
+			"import": "./dist/http/index.js"
+		},
+		"./oauth": {
+			"types": "./dist/oauth/index.d.ts",
+			"import": "./dist/oauth/index.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json && ts-add-js-extension --dir=dist",
+		"prepare": "pnpm build",
+		"type-check": "tsc --noEmit",
+		"lint": "eslint src/",
+		"lint:fix": "eslint src/ --fix",
+		"format": "prettier --write .",
+		"format:check": "prettier --check .",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"validate": "pnpm run type-check && pnpm run lint && pnpm run format:check && pnpm run test && pnpm run build",
+		"prepublishOnly": "pnpm run validate"
+	},
+	"keywords": [
+		"mcp",
+		"model-context-protocol",
+		"cloudflare-workers",
+		"oauth",
+		"typescript"
+	],
+	"author": "Levi Bucsis",
+	"license": "MIT",
+	"engines": {
+		"node": ">=22"
+	},
+	"peerDependencies": {
+		"@cloudflare/workers-oauth-provider": "^0.8.3",
+		"@modelcontextprotocol/server": "^2.0.0",
+		"agents": "^0.20.1",
+		"hono": "^4.8.0",
+		"zod": "^4.0.0"
+	},
+	"peerDependenciesMeta": {
+		"@cloudflare/workers-oauth-provider": {
+			"optional": true
+		},
+		"agents": {
+			"optional": true
+		},
+		"hono": {
+			"optional": true
+		}
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/levibe/mcp-worker.git"
+	},
+	"homepage": "https://github.com/levibe/mcp-worker#readme",
+	"bugs": {
+		"url": "https://github.com/levibe/mcp-worker/issues"
+	},
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://npm.pkg.github.com"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-oauth-provider": "^0.8.3",
+		"@cloudflare/workers-types": "^4.20250101.0",
+		"@eslint/js": "^9.31.0",
+		"@modelcontextprotocol/server": "2.0.0",
+		"@vitest/coverage-v8": "^4.1.10",
+		"agents": "^0.20.1",
+		"eslint": "^9.31.0",
+		"eslint-config-prettier": "^10.1.8",
+		"hono": "^4.8.3",
+		"prettier": "^3.6.2",
+		"ts-add-js-extension": "^1.6.6",
+		"typescript": "^5.8.3",
+		"typescript-eslint": "^8.65.0",
+		"vitest": "^4.1.10",
+		"zod": "^4.4.3"
+	}
+}

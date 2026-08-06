@@ -1,0 +1,12 @@
+dist
+node_modules
+coverage
+
+# Worktrees are kept in-repo at .worktrees/<branch>, ignored through the global git ignore.
+# Git honours that file and Prettier does not, so without this line `prettier --check .`
+# walks into every worktree and checks another branch's working tree as though it were this
+# one's — and an unresolved conflict marker over there fails validate over here.
+.worktrees
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
