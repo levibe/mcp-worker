@@ -18,11 +18,12 @@
  * target to climb. Raise one when real coverage lands. Say so in the commit when
  * you lower one, because that is coverage being given up.
  *
- * What carries no pin is deliberate too: the vendored OAuth helper is
- * quarantined debt (#2), `require-changes` and the upstream-OAuth helpers are
- * covered through their consumers in the apps built on this package, and the
- * barrels have nothing to decide. They all stay in the denominator so the holes
- * are visible, per the coverage.include comment in vitest.config.ts.
+ * What carries no pin is deliberate too: the vendored OAuth helper's
+ * `parseRedirectApproval` has no direct test yet, `require-changes` and the
+ * upstream-OAuth helpers are covered through their consumers in the apps built
+ * on this package, and the barrels have nothing to decide. They all stay in the
+ * denominator so the holes are visible, per the coverage.include comment in
+ * vitest.config.ts.
  */
 export const coverageThresholds = {
 	// The decode helper decides — try the bytes as UTF-8, fall back to the legacy format —

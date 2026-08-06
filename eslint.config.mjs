@@ -23,8 +23,8 @@ export default tseslint.config(
 			],
 			// Held at error so an unexamined `any` cannot land silently — while this warned in the
 			// repo these modules came from, validate passed with any number of them in the tree,
-			// which is how 66 accumulated unnoticed there. The vendored OAuth helper below is the
-			// one exception.
+			// which is how 66 accumulated unnoticed there. No file is exempt, vendored code
+			// included; a new `any` anywhere needs its own argued-for exemption.
 			'@typescript-eslint/no-explicit-any': 'error',
 			'@typescript-eslint/explicit-module-boundary-types': 'off',
 			'@typescript-eslint/no-non-null-assertion': 'off',
@@ -76,12 +76,6 @@ export default tseslint.config(
 				},
 			],
 		},
-	},
-	{
-		// Vendored OAuth helper, quarantined at the old severity so the rest of src/ can hold
-		// no-explicit-any at error. Typing it properly is #2, which deletes this override.
-		files: ['src/oauth/workers-oauth-utils.ts'],
-		rules: { '@typescript-eslint/no-explicit-any': 'warn' },
 	},
 	// Must stay last so it switches off every formatting rule enabled above and
 	// leaves Prettier as the only thing with an opinion about layout.
