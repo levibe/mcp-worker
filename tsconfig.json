@@ -1,0 +1,22 @@
+{
+	"compilerOptions": {
+		"target": "es2022",
+		"module": "es2022",
+		/* es2022 for Error.cause, which the transport's error chain relies on. */
+		"lib": ["es2022"],
+		"moduleResolution": "bundler",
+		/* The runtime globals — Request, Response, Headers, ExecutionContext — come from
+		   workers-types, a devDependency only. The emitted d.ts refers to them as bare
+		   globals, which resolve against the consumer's own generated types, so nothing
+		   ambient is forced on consumers. The /latest entrypoint rather than the bare one,
+		   which is the oldest compatibility date and predates Headers.getSetCookie. */
+		"types": ["@cloudflare/workers-types/latest"],
+		"strict": true,
+		"noEmit": true,
+		"isolatedModules": true,
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"skipLibCheck": true
+	},
+	"exclude": ["node_modules", "dist"]
+}

@@ -1,0 +1,145 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# Supersede in-flight runs on a branch that gets pushed again. Kept off for
+# main so every merged commit still gets a result of its own.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Inherits the read-only block above. Reporting coverage needs a token that can
+  # write to pull requests, and that lives in its own job below rather than here,
+  # where dependency install scripts run.
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # persist-credentials: false keeps the checkout token out of .git/config.
+      # Nothing here pushes, and the install step below runs dependency build
+      # scripts, which would otherwise execute alongside a readable token.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Reject lockfiles from other package managers
+        run: |
+          if [ -f package-lock.json ] || [ -f yarn.lock ]; then
+            echo "::error::This project is pnpm-only. Remove package-lock.json / yarn.lock and commit pnpm-lock.yaml instead."
+            exit 1
+          fi
+
+      # Reads the pinned version from the packageManager field in package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # Fails if pnpm-lock.yaml has drifted from package.json. This also runs
+      # the supply-chain checks configured in pnpm-workspace.yaml against every
+      # lockfile entry, on a machine with no warm verification cache.
+      #
+      # The token exists so the committed .npmrc's ${GITHUB_PACKAGES_TOKEN}
+      # reference expands — pnpm refuses to run with it unset — not because any
+      # dependency here lives on GitHub Packages.
+      - run: pnpm install --frozen-lockfile
+        env:
+          GITHUB_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # These five are the checks `pnpm run validate` chains together, in the
+      # same order. Split apart so the checks UI names the one that failed;
+      # validate stays as the single command to run locally. Only Test differs,
+      # and the comment there says why.
+      - name: Type check
+        run: pnpm run type-check
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Format check
+        run: pnpm run format:check
+
+      # test:coverage rather than test, so the one run that happens here also
+      # produces the json the reporting job reads. validate stays on the bare
+      # test locally, where coverage is something you ask for deliberately.
+      - name: Test
+        run: pnpm run test:coverage
+
+      - name: Build
+        run: pnpm run build
+
+      # Hand the json to the reporting job rather than reporting from here. Only
+      # the two files it reads, so the html report does not ride along.
+      #
+      # Uploads after a failed step too, since reportOnFailure means a red run
+      # still produced something worth reporting. if-no-files-found: ignore
+      # covers the case where an earlier check failed before the tests ran, and
+      # there is no coverage/ to collect at all.
+      - name: Upload coverage
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: |
+            coverage/coverage-summary.json
+            coverage/coverage-final.json
+          if-no-files-found: ignore
+          retention-days: 1
+
+  # Separate job so that pull-requests: write never shares a runner with
+  # `pnpm install`, which executes the build scripts pnpm-workspace.yaml answers
+  # for. Nothing here installs or runs project code — it checks out, unpacks the
+  # json and reports.
+  coverage-report:
+    needs: validate
+    # Runs even when validate failed, since a red run is when the report has the
+    # most to say. !cancelled() rather than always() so cancelling a superseded
+    # run leaves no comment behind. Pull requests only: a push to main has
+    # nothing to comment on.
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      # The action reads coverage.thresholds out of vitest.config.ts, so the
+      # config has to be on disk. persist-credentials: false for the same reason
+      # as in validate, and more so here, where the token can write.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # A missing artifact means validate failed before the tests ran. That is a
+      # run with nothing to report, not a reason to fail a second time.
+      - name: Download coverage
+        id: coverage
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: coverage
+          path: coverage
+
+      # Renders the json as a job summary and as a single pull request comment
+      # that gets rewritten in place on each push.
+      #
+      # Pinned to the commit behind v2.12.2 rather than to the tag, because a tag
+      # can be moved to point at something else. This is the only third-party
+      # action here — the rest are actions/* and pnpm/*.
+      - name: Report coverage
+        if: ${{ steps.coverage.outcome == 'success' }}
+        # A pull request from a fork gets a read-only token whatever the block
+        # above says, so commenting cannot work there and the run should not go
+        # red over it. Anything else failing here is real and should be seen,
+        # which a blanket continue-on-error would hide.
+        continue-on-error: ${{ github.event.pull_request.head.repo.fork }}
+        uses: davelosert/vitest-coverage-report-action@8b157684c6a6b259b97d45e72b44242865c0f6a5 # v2.12.2
