@@ -17,8 +17,72 @@
  * unrelated work does not trip it. They ratchet against erosion; they are not a
  * target to climb. Raise one when real coverage lands. Say so in the commit when
  * you lower one, because that is coverage being given up.
+ *
+ * What carries no pin is deliberate too: the vendored OAuth helper is
+ * quarantined debt (#2), `require-changes` and the upstream-OAuth helpers are
+ * covered through their consumers in the apps built on this package, and the
+ * barrels have nothing to decide. They all stay in the denominator so the holes
+ * are visible, per the coverage.include comment in vitest.config.ts.
  */
 export const coverageThresholds = {
-	// Filled when the lifted modules land with their tests. The scaffold ships no source, so
-	// there is nothing to pin yet.
+	// The decode helper decides — try the bytes as UTF-8, fall back to the legacy format —
+	// and the fallback is what keeps year-old approval cookies readable, so losing its test
+	// would be losing the rollout guarantee, not a number.
+	'src/oauth/base64.ts': {
+		statements: 100,
+		branches: 100,
+		functions: 100,
+		lines: 100,
+	},
+	// The two halves of the publication policy: what a config resolves to, and what a ceiling
+	// publishes. Both are small and decide everything about which tools a client is offered,
+	// so any drop here is a regression in the security boundary rather than a rounding
+	// artefact.
+	'src/registry/tool-ceilings.ts': {
+		statements: 100,
+		branches: 100,
+		functions: 100,
+		lines: 100,
+	},
+	'src/registry/tool-registry.ts': {
+		statements: 100,
+		branches: 100,
+		functions: 100,
+		lines: 100,
+	},
+	'src/registry/error-handling.ts': {
+		statements: 100,
+		branches: 100,
+		functions: 100,
+		lines: 100,
+	},
+	// The factory owns the two invariants that fail silently under local testing — a fresh
+	// server per request, the announcement once per isolate — so a drop here is a regression
+	// in exactly the code whose failure mode is invisible until load.
+	'src/index.ts': {
+		statements: 100,
+		branches: 100,
+		functions: 100,
+		lines: 100,
+	},
+	// The transport carries the retry decisions, the deadline arithmetic and the Retry-After
+	// handling. Branches measured 91 at the lift; the uncovered arms are the not-a-URL
+	// redirect Location, the non-Error rethrow, and the unreachable throw ending the retry
+	// loop. Functions sits below 100 for one reason: `send`, the verb→policy dispatch, is a
+	// one-line delegation that the zendesk client's integration tests drive and this package's
+	// transport suite does not reach on its own — measured 92 at the lift.
+	'src/http/http-client.ts': { branches: 90, functions: 92 },
+	// It pins 100 on branches, which it could not do while the "what did this throw" ternary
+	// was written out at each of five catch sites: `atob`, `JSON.parse` and `btoa` all throw
+	// real Errors, so four of those five pairs had an arm nothing could reach. Behind one
+	// `reasonFor` helper there is a single pair, and the provider stub throwing a bare string
+	// covers it. Do not read the 100 as every path being exercised — see the note on
+	// POST /authorize in the test file, where the module mock makes coverage report a guarded
+	// and an unguarded route identically.
+	'src/oauth/google-handler.ts': {
+		statements: 100,
+		branches: 100,
+		functions: 100,
+		lines: 100,
+	},
 }

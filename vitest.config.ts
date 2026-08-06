@@ -14,8 +14,6 @@ export default defineConfig({
 		// equivalent switch for them.
 		restoreMocks: true,
 		unstubGlobals: true,
-		// Scaffold-only: removed when the lifted suite lands with the modules it covers.
-		passWithNoTests: true,
 		coverage: {
 			provider: 'v8',
 			// text and html are for reading locally. Run through a coding agent, the text
