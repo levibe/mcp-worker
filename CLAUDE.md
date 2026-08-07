@@ -64,7 +64,7 @@ The supply-chain settings in `pnpm-workspace.yaml` follow the house convention: 
 
 ## Code quality
 
-Prettier owns formatting and ESLint owns everything else, switched apart through `eslint-config-prettier`. `no-explicit-any` is held at `error`; the one exception is the vendored `src/oauth/workers-oauth-utils.ts`, quarantined at `warn` by a scoped override that #2 deletes when it types the file properly. Do not widen the override.
+Prettier owns formatting and ESLint owns everything else, switched apart through `eslint-config-prettier`. `no-explicit-any` is held at `error` across the whole package, vendored code included; a new `any` anywhere needs its own argued-for exemption.
 
 The `no-restricted-imports` guard on `withErrorHandling` exists because `registerTools` is the only place that may call it — a second wrap encodes the inner response as the text of the outer one and buries `isError`, so a failed write reports as a success. The exemptions are the defining file, the one call site, the registry barrel (a re-export is an import to this rule), and tests. The README carries the copy-paste version of the same guard for consumers.
 
