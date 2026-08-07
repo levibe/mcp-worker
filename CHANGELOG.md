@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - The vendored `workers-oauth-utils` is typed by narrowing from `unknown`; the scoped `no-explicit-any` override is gone and the rule holds at `error` package-wide
 - `ApprovalDialogOptions.state` is `object` and `ParsedApprovalResult.state` is `Record<string, unknown> & { oauthReqInfo?: unknown }`, both formerly `any`-typed. Passing state in accepts what it always did; reading the returned state now yields `unknown` values that need narrowing where `any` compiled unchecked
 - `parseRedirectApproval` refuses a state whose `oauthReqInfo.clientId` is a truthy non-string; it previously wrote it into the approval cookie, which the cookie's own reader then rejected wholesale
+- Lifted comments no longer point at the config test and grant figure that stayed in zendesk; they speak from the package's point of view
 
 ## [0.1.0] - 2026-08-05
 
