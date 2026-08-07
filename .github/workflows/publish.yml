@@ -13,6 +13,16 @@ jobs:
       contents: read
       packages: write
 
+    # GITHUB_TOKEN carries packages: write for this repo, which is all the
+    # publish below needs. setup-node's registry-url writes the credential as
+    # an ${NODE_AUTH_TOKEN} reference into a runner-owned user-level config —
+    # the flow the README recommends to consumers, and the reason the committed
+    # .npmrc carries no credential line (pnpm 11 refuses project-level auth).
+    # Job-level env because pnpm reads that config on every invocation here,
+    # publish and validate chain alike, and errors if the reference is unset.
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,13 +35,10 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
+          registry-url: https://npm.pkg.github.com
+          scope: '@levibe'
 
-      # GITHUB_TOKEN carries packages: write for this repo, which is all the
-      # publish below needs; the same value also satisfies the committed
-      # .npmrc's ${GITHUB_PACKAGES_TOKEN} reference at install time.
       - run: pnpm install --frozen-lockfile
-        env:
-          GITHUB_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # The tag names the release and package.json names the artifact, and
       # publishing an artifact that disagrees with its tag is how a version
@@ -48,5 +55,3 @@ jobs:
       # prepublishOnly runs the full validate chain before anything uploads.
       - name: Publish to GitHub Packages
         run: pnpm publish --no-git-checks
-        env:
-          GITHUB_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}

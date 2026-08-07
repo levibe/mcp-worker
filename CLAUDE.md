@@ -75,7 +75,7 @@ Vitest with no runtime of its own: everything under test is pure or reachable th
 Error-message assertion strings are behavior, not tests to update. They were kept byte-identical through the extraction, and the zendesk suite passing against this package's tarball is what proved the lift; an edit to one of those assertions is a semver-visible change to what consumers match on.
 
 ```bash
-pnpm install             # needs GITHUB_PACKAGES_TOKEN set for the committed .npmrc
+pnpm install             # no token needed: nothing here installs from GitHub Packages
 pnpm run validate        # type-check, lint, format:check, test, build — what CI runs, split
 pnpm run test:watch      # re-run on change while working
 pnpm run test:coverage   # coverage report (text plus coverage/index.html)
