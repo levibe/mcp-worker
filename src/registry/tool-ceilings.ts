@@ -59,7 +59,8 @@ export interface ResolvedCeilings {
  * Resolves `TOOL_CEILINGS` from `env` into a ceiling per group, failing closed to `read` on
  * every group when the config is missing or malformed. Failing closed is silent in production
  * — the deploy succeeds and tools just vanish — so the caller has to log `error` loudly, and
- * a unit test parses the shipped `wrangler.jsonc` so a bad config cannot get past `validate`.
+ * a consumer should keep a config test of its own so a bad config cannot get past its
+ * `validate` (zendesk-mcp-cloudflare's parses the `wrangler.jsonc` it ships).
  *
  * A string is accepted and parsed as JSON because `.dev.vars` can shadow the var locally, and
  * everything arriving from there is a string. The schema is strict in both directions — every

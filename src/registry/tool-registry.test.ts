@@ -4,10 +4,11 @@
  * A tool that is defined but never registered cannot be called; one that slips through can.
  *
  * Everything here is pure registry behavior, driven through a stub client — the registry
- * never calls into the client, it only binds it. The tests that hold this repo's shipped
- * surface still — the pinned inventory, and the announcement over the real manifest — live
- * in `src/tool-ceilings-config.test.ts`, because they are coupled to wrangler.jsonc and
- * `toolCategories` rather than to the registry.
+ * never calls into the client, it only binds it. The tests that hold a deployment's shipped
+ * surface still — the pinned inventory, and the announcement over the real manifest — stay
+ * with the consumer (zendesk-mcp-cloudflare keeps them in `src/tool-ceilings-config.test.ts`),
+ * because they are coupled to its wrangler.jsonc and `toolCategories` rather than to the
+ * registry.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -220,8 +221,9 @@ describe('registerTools', () => {
 
 describe('registerAllTools', () => {
 	// The runtime backstop for a category that lands in toolCategories before the shipped
-	// TOOL_CEILINGS names it. The config test fails validate on that drift; this is what the
-	// deployed worker does in the meantime, and it has to fail closed rather than open.
+	// TOOL_CEILINGS names it. A consumer's config test fails its validate on that drift; this
+	// is what the deployed worker does in the meantime, and it has to fail closed rather than
+	// open.
 	it('treats a group the ceilings never named as read-only', () => {
 		const server = stubServer()
 

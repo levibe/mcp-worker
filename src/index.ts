@@ -25,8 +25,8 @@ export interface McpWorkerOptions<TEnv extends GoogleHandlerSecrets, C> {
 	 * risk-posture decision — the token is the only revocation there is for a server whose
 	 * upstream identity is never re-checked — so the default is a moderate middle between the
 	 * OAuth provider library's thirty days (a re-auth every month) and a deployment-argued
-	 * year. State your own number when your deployment has its own argument; this repo does,
-	 * in index.ts, next to the figure it justifies.
+	 * year. State your own number when your deployment has its own argument —
+	 * zendesk-mcp-cloudflare does, next to the year-long figure in its own index.ts.
 	 */
 	refreshTokenTTL?: number
 	/**
@@ -58,11 +58,13 @@ export interface McpWorkerOptions<TEnv extends GoogleHandlerSecrets, C> {
 	 * session at ninety days no matter what the grant said — the same outage, arriving from
 	 * the side nobody was looking at.
 	 *
-	 * The headroom over the grant is sized to how clients are actually minted rather than to
-	 * anything in the spec: a connector registers a fresh client each time it connects, so a
-	 * client and the grant issued against it are minutes apart in practice. It would not cover
-	 * a client reused for a new grant much later, which is worth re-deriving rather than
-	 * assuming if a client ever starts being long-lived.
+	 * The four hundred is sized over the longest grant a deployment argues, not this
+	 * package's ninety-day default: zendesk-mcp-cloudflare runs a year-long grant, and the
+	 * month of headroom above it is sized to how clients are actually minted rather than to
+	 * anything in the spec — a connector registers a fresh client each time it connects, so a
+	 * client and the grant issued against it are minutes apart in practice. It would not
+	 * cover a client reused for a new grant much later, which is worth re-deriving rather
+	 * than assuming if a client ever starts being long-lived.
 	 */
 	clientRegistrationTTL?: number
 }

@@ -60,8 +60,8 @@ export const registerTools = <C>(
  *
  * A group the config never named falls closed to `read`. The config schema requires every
  * group, so this only happens when a new category lands in `toolCategories` before the
- * shipped `TOOL_CEILINGS` names it — the config test fails `validate` on exactly that drift,
- * and this fallback is the runtime backstop, not the mechanism.
+ * shipped `TOOL_CEILINGS` names it — a consumer's own config test is what fails `validate`
+ * on exactly that drift, and this fallback is the runtime backstop, not the mechanism.
  *
  * Registration stays one walk over `toolCategories` in declaration order. The deterministic
  * tool list the `tools/list` cache reasoning leans on falls out of that, so do not regroup
