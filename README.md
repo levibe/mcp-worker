@@ -17,11 +17,12 @@ Subpath exports keep dependency reach honest. A consumer of `./registry` plus `.
 
 ## Installing
 
-The package lives on GitHub Packages, so the registry mapping has to exist before `pnpm install` can see it. Commit an `.npmrc` with:
+The package lives on GitHub Packages, which requires a token to install even public packages. The registry mapping is safe to commit; the credential is not, and since pnpm 11 it cannot be. pnpm refuses to expand environment variables in auth settings that come from a committed project-level `.npmrc`, because that file could route the secret to an attacker-controlled registry. It warns and then sends no Authorization header at all, so the install fails with a 401 that looks like a bad token rather than an ignored one.
+
+Commit an `.npmrc` with only the mapping:
 
 ```
 @levibe:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=${GITHUB_PACKAGES_TOKEN}
 ```
 
 Then add the dependency:
@@ -30,11 +31,27 @@ Then add the dependency:
 pnpm add @levibe/mcp-worker
 ```
 
-Three places need the token, and they are different tokens:
+The credential is a classic PAT with `read:packages`. The package is public, so the PAT needs that scope and nothing else (note that `gh auth token` does not carry it). What varies per environment is how the credential reaches pnpm from a source it still trusts, which means user-level config:
 
-- **Locally**: a classic PAT with `read:packages`, exported as `GITHUB_PACKAGES_TOKEN`. Note that `gh auth token` does not carry `read:packages`.
-- **CI**: the same-repo `GITHUB_TOKEN` cannot read another repository's private package, so store a PAT as a secret (the house convention names it `PACKAGES_READ_TOKEN`) and pass it as `GITHUB_PACKAGES_TOKEN` on the install step.
-- **Cloudflare Workers Builds**: add `GITHUB_PACKAGES_TOKEN` as a build environment variable in the dashboard. It is a build-time value, not a runtime var.
+- **Locally**: put the credential in your user-level `~/.npmrc`, where pnpm still expands environment references:
+
+  ```
+  //npm.pkg.github.com/:_authToken=${GITHUB_PACKAGES_TOKEN}
+  ```
+
+- **GitHub Actions**: let `actions/setup-node` write the credential into a runner-owned user-level config, and pass the token to every step that runs pnpm (an env reference in config errors when the variable is unset, so job-level `env` is simplest):
+
+  ```yaml
+  - uses: actions/setup-node@v4
+    with:
+      registry-url: https://npm.pkg.github.com
+      scope: '@levibe'
+  - run: pnpm install --frozen-lockfile
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN }}
+  ```
+
+- **Cloudflare Workers Builds**: there is no setup-node to lean on, so commit the credential reference as a separate file (say `.npmrc.build`) and set two build environment variables in the dashboard: `NPM_CONFIG_USERCONFIG` pointing at that file, and `GITHUB_PACKAGES_TOKEN` itself. Designating the file as user-level config is what makes pnpm willing to expand it. Both are build-time values, not runtime vars.
 
 ## Quick start
 
@@ -135,7 +152,7 @@ Worth knowing before changing anything, because each one looks refactorable into
 ## Development
 
 ```bash
-pnpm install             # needs GITHUB_PACKAGES_TOKEN in the environment for .npmrc
+pnpm install             # no token needed: nothing here installs from GitHub Packages
 pnpm run validate        # type-check, lint, format:check, test, build
 pnpm run test:watch      # re-run on change
 pnpm run test:coverage   # coverage report (text plus coverage/index.html)

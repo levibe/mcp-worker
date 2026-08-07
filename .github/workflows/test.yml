@@ -48,12 +48,10 @@ jobs:
       # the supply-chain checks configured in pnpm-workspace.yaml against every
       # lockfile entry, on a machine with no warm verification cache.
       #
-      # The token exists so the committed .npmrc's ${GITHUB_PACKAGES_TOKEN}
-      # reference expands — pnpm refuses to run with it unset — not because any
-      # dependency here lives on GitHub Packages.
+      # No token: nothing here installs from GitHub Packages, and the committed
+      # .npmrc carries only the registry mapping, so there is no env reference
+      # for pnpm to demand a value for.
       - run: pnpm install --frozen-lockfile
-        env:
-          GITHUB_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # These five are the checks `pnpm run validate` chains together, in the
       # same order. Split apart so the checks UI names the one that failed;
