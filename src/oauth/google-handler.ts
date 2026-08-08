@@ -149,7 +149,7 @@ export const createGoogleHandler = (options: GoogleHandlerOptions) => {
 	async function redirectToGoogle(
 		c: Context,
 		oauthReqInfo: AuthRequest,
-		headers: Record<string, string> = {}
+		headers: Record<string, string> = {},
 	) {
 		// The state is minted through encodeBase64Json, which goes through UTF-8, so a caller's own
 		// text survives the trip whatever characters it carries. That matters here because this is
@@ -198,7 +198,7 @@ export const createGoogleHandler = (options: GoogleHandlerOptions) => {
 				scope: 'email profile',
 				state,
 				upstreamUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
-			})
+			}),
 		)
 
 		return new Response(null, {

@@ -96,12 +96,12 @@ const testEnv = (overrides: Record<string, unknown> = {}) =>
 const callback = (
 	query: Record<string, string>,
 	env = testEnv(),
-	cookie: string | null = NONCE_COOKIE
+	cookie: string | null = NONCE_COOKIE,
 ) =>
 	GoogleHandler.request(
 		`/callback?${new URLSearchParams(query).toString()}`,
 		cookie === null ? undefined : { headers: { cookie } },
-		env
+		env,
 	)
 
 /** /authorize reaches for two provider methods that /callback never touches. */
@@ -192,7 +192,7 @@ describe('GET /callback', () => {
 
 			expect(warn).toHaveBeenCalledWith(
 				'Callback state could not be decoded:',
-				expect.stringMatching(/./)
+				expect.stringMatching(/./),
 			)
 			await expect(response.text()).resolves.toBe('Invalid state')
 		})
@@ -211,7 +211,7 @@ describe('GET /callback', () => {
 
 			expect(response.status).toBe(302)
 			expect(completeAuthorization).toHaveBeenCalledWith(
-				expect.objectContaining({ request: expect.objectContaining({ state: 'Āé😀' }) })
+				expect.objectContaining({ request: expect.objectContaining({ state: 'Āé😀' }) }),
 			)
 		})
 
@@ -225,7 +225,7 @@ describe('GET /callback', () => {
 
 			expect(response.status).toBe(302)
 			expect(completeAuthorization).toHaveBeenCalledWith(
-				expect.objectContaining({ request: expect.objectContaining({ state: 'café' }) })
+				expect.objectContaining({ request: expect.objectContaining({ state: 'café' }) }),
 			)
 		})
 	})
@@ -313,7 +313,7 @@ describe('GET /callback', () => {
 
 			expect(error).toHaveBeenCalledWith(
 				'completeAuthorization rejected the request:',
-				'Client not found: no-such-client'
+				'Client not found: no-such-client',
 			)
 			await expect(response.text()).resolves.not.toContain('no-such-client')
 		})
@@ -328,7 +328,7 @@ describe('GET /callback', () => {
 
 			expect(error).toHaveBeenCalledWith(
 				'completeAuthorization rejected the request:',
-				'a bare string'
+				'a bare string',
 			)
 			expect(response.status).toBe(400)
 		})
@@ -341,12 +341,12 @@ describe('GET /callback', () => {
 
 			const response = await callback(
 				{ state: validState, code: 'google-code' },
-				testEnv({ HOSTED_DOMAIN: 'example.com' })
+				testEnv({ HOSTED_DOMAIN: 'example.com' }),
 			)
 
 			expect(response.status).toBe(403)
 			await expect(response.text()).resolves.toBe(
-				'Access restricted to example.com domain users only'
+				'Access restricted to example.com domain users only',
 			)
 			expect(completeAuthorization).not.toHaveBeenCalled()
 		})
@@ -361,17 +361,17 @@ describe('GET /callback', () => {
 
 				const response = await callback(
 					{ state: validState, code: 'google-code' },
-					testEnv({ HOSTED_DOMAIN: 'example.com' })
+					testEnv({ HOSTED_DOMAIN: 'example.com' }),
 				)
 
 				expect(response.status).toBe(403)
-			}
+			},
 		)
 
 		it('admits a sign-in from inside the hosted domain', async () => {
 			const response = await callback(
 				{ state: validState, code: 'google-code' },
-				testEnv({ HOSTED_DOMAIN: 'example.com' })
+				testEnv({ HOSTED_DOMAIN: 'example.com' }),
 			)
 
 			expect(response.status).toBe(302)
@@ -390,7 +390,7 @@ describe('GET /callback', () => {
 
 			const response = await callback(
 				{ state: validState, code: 'google-code' },
-				testEnv({ HOSTED_DOMAIN: hostedDomain })
+				testEnv({ HOSTED_DOMAIN: hostedDomain }),
 			)
 
 			expect(response.status).toBe(302)
@@ -404,7 +404,7 @@ describe('GET /callback', () => {
 
 			const response = await callback(
 				{ state: validState, code: 'google-code' },
-				testEnv({ HOSTED_DOMAIN: 'Example.com' })
+				testEnv({ HOSTED_DOMAIN: 'Example.com' }),
 			)
 
 			expect(response.status).toBe(403)
@@ -438,7 +438,7 @@ describe('GET /callback', () => {
 		})
 		expect(response.status).toBe(302)
 		expect(response.headers.get('location')).toBe(
-			'https://client.example.com/oauth/callback?code=granted'
+			'https://client.example.com/oauth/callback?code=granted',
 		)
 	})
 
@@ -464,7 +464,7 @@ describe('GET /callback', () => {
 			const response = await callback(
 				{ state: validState, code: 'google-code' },
 				testEnv(),
-				'mcp-auth-nonce=a-different-browser'
+				'mcp-auth-nonce=a-different-browser',
 			)
 
 			expect(response.status).toBe(400)
@@ -507,7 +507,7 @@ describe('GET /callback', () => {
 			await callback({ state: validState, code: 'google-code' })
 
 			expect(completeAuthorization).toHaveBeenCalledWith(
-				expect.objectContaining({ request: expect.not.objectContaining({ nonce: NONCE }) })
+				expect.objectContaining({ request: expect.not.objectContaining({ nonce: NONCE }) }),
 			)
 		})
 	})
@@ -597,7 +597,7 @@ describe('/authorize', () => {
 			expect(clientIdAlreadyApproved).toHaveBeenCalledWith(
 				expect.any(Request),
 				'test-client',
-				'test-cookie-secret'
+				'test-cookie-secret',
 			)
 			expect(response.status).toBe(302)
 			expect(googleUrl(response).hostname).toBe('accounts.google.com')
@@ -610,7 +610,7 @@ describe('/authorize', () => {
 			expect(lookupClient).toHaveBeenCalledWith('test-client')
 			expect(renderApprovalDialog).toHaveBeenCalledWith(
 				expect.any(Request),
-				expect.objectContaining({ client: clientInfo, state: { oauthReqInfo: authRequest } })
+				expect.objectContaining({ client: clientInfo, state: { oauthReqInfo: authRequest } }),
 			)
 			expect(response.status).toBe(200)
 			await expect(response.text()).resolves.toBe('<approval dialog>')
@@ -658,14 +658,14 @@ describe('/authorize', () => {
 			it('logs the real reason without relaying it to the caller', async () => {
 				const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
 				vi.mocked(parseRedirectApproval).mockRejectedValue(
-					new Error('Failed to parse approval form: not base64')
+					new Error('Failed to parse approval form: not base64'),
 				)
 
 				const response = await approve()
 
 				expect(warn).toHaveBeenCalledWith(
 					'parseRedirectApproval rejected the request:',
-					'Failed to parse approval form: not base64'
+					'Failed to parse approval form: not base64',
 				)
 				await expect(response.text()).resolves.not.toContain('base64')
 			})
@@ -707,7 +707,7 @@ describe('/authorize', () => {
 			await expect(response.text()).resolves.toBe('Invalid request')
 			expect(warn).toHaveBeenCalledWith(
 				'The authorization request could not be encoded as state:',
-				expect.stringMatching(/./)
+				expect.stringMatching(/./),
 			)
 		})
 

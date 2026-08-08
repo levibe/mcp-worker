@@ -47,7 +47,7 @@ export class HttpRequestError extends Error {
 		message: string,
 		readonly status?: number,
 		readonly retryAfterMs?: number,
-		options?: ErrorOptions
+		options?: ErrorOptions,
 	) {
 		super(message, options)
 		this.name = 'HttpRequestError'
@@ -120,7 +120,7 @@ function errorFromResponse(response: Response, message: string, cause?: unknown)
 		message,
 		response.status,
 		parseRetryAfter(response.headers.get('retry-after')),
-		cause !== undefined ? { cause } : undefined
+		cause !== undefined ? { cause } : undefined,
 	)
 }
 
@@ -296,7 +296,7 @@ export class HttpClient {
 		endpoint: string,
 		data?: unknown,
 		params?: Record<string, unknown>,
-		{ timeoutMs = DEFAULT_TIMEOUT_MS }: { timeoutMs?: number } = {}
+		{ timeoutMs = DEFAULT_TIMEOUT_MS }: { timeoutMs?: number } = {},
 	): Promise<unknown> {
 		// Everything down to the `try` sits outside it on purpose, and where the try starts is
 		// the point rather than a detail of layout. The catch rewraps whatever it sees as an
@@ -368,7 +368,7 @@ export class HttpClient {
 			if (response.status >= 300 && response.status < 400) {
 				throw errorFromResponse(
 					response,
-					`${this.label} API Error: ${response.status} - ${describeRedirect(response, url, this.redirectHint)}`
+					`${this.label} API Error: ${response.status} - ${describeRedirect(response, url, this.redirectHint)}`,
 				)
 			}
 
@@ -389,7 +389,7 @@ export class HttpClient {
 
 				throw errorFromResponse(
 					response,
-					`${this.label} API Error: ${response.status} - ${errorText}`
+					`${this.label} API Error: ${response.status} - ${errorText}`,
 				)
 			}
 
@@ -408,7 +408,7 @@ export class HttpClient {
 					throw errorFromResponse(
 						response,
 						`${this.label} answered ${response.status} with a body that is not valid JSON`,
-						cause
+						cause,
 					)
 				}
 			} else {
@@ -425,7 +425,7 @@ export class HttpClient {
 					`${this.label} request failed: ${error.message}`,
 					answered?.status,
 					answered?.retryAfterMs,
-					{ cause: error }
+					{ cause: error },
 				)
 			}
 			throw error
@@ -502,7 +502,7 @@ export class HttpClient {
 		method: string,
 		endpoint: string,
 		data?: unknown,
-		params?: Record<string, unknown>
+		params?: Record<string, unknown>,
 	): Promise<unknown> {
 		const deadline = Date.now() + TOTAL_TIMEOUT_MS
 		let lastError: Error | undefined
@@ -568,7 +568,7 @@ export class HttpClient {
 							retryAfterMs: requested,
 							method,
 							endpoint,
-						}
+						},
 					)
 					throw error
 				}
@@ -579,7 +579,7 @@ export class HttpClient {
 						error: error instanceof Error ? error.message : String(error),
 						method,
 						endpoint,
-					}
+					},
 				)
 
 				// Wait before retrying
@@ -622,7 +622,7 @@ export class HttpClient {
 		method: string,
 		endpoint: string,
 		data?: unknown,
-		params?: Record<string, unknown>
+		params?: Record<string, unknown>,
 	): Promise<unknown> {
 		return this.requestWithRetry(method, endpoint, data, params)
 	}

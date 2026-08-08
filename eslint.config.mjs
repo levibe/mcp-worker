@@ -84,5 +84,5 @@ export default tseslint.config(
 	prettier,
 	{
 		ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.js', '*.mjs', '*.cjs', '*.d.ts'],
-	}
+	},
 )

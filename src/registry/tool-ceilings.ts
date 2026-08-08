@@ -41,7 +41,7 @@ export const isWithinCeiling = (level: DeclarableLevel, ceiling: DeclarableLevel
 // Derived from the rank table rather than restated, so a level cannot exist in the schema
 // without an order or in the order without the schema.
 const declarableLevelSchema = z.enum(
-	Object.keys(LEVEL_ORDER) as [DeclarableLevel, ...DeclarableLevel[]]
+	Object.keys(LEVEL_ORDER) as [DeclarableLevel, ...DeclarableLevel[]],
 )
 
 export interface ResolvedCeilings {
@@ -91,7 +91,7 @@ export const resolveCeilings = (raw: unknown, groups: readonly string[]): Resolv
 	if (!parsed.success) {
 		const issues = parsed.error.issues
 			.map((issue) =>
-				issue.path.length > 0 ? `${issue.path.join('.')}: ${issue.message}` : issue.message
+				issue.path.length > 0 ? `${issue.path.join('.')}: ${issue.message}` : issue.message,
 			)
 			.join('; ')
 

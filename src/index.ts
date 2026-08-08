@@ -88,7 +88,7 @@ export interface McpWorkerOptions<TEnv extends GoogleHandlerSecrets, C> {
  *   Two first requests racing can double-log; that is benign and not worth a lock.
  */
 export const createMcpWorker = <TEnv extends GoogleHandlerSecrets, C>(
-	options: McpWorkerOptions<TEnv, C>
+	options: McpWorkerOptions<TEnv, C>,
 ): OAuthProvider<TEnv> => {
 	let announced = false
 
@@ -118,7 +118,7 @@ export const createMcpWorker = <TEnv extends GoogleHandlerSecrets, C>(
 			// special path. Malformed or missing config fails closed to read on every group.
 			const resolved = resolveCeilings(
 				options.ceilingsFrom(env),
-				Object.keys(options.toolCategories)
+				Object.keys(options.toolCategories),
 			)
 
 			// The refusal is logged on every request it affects, not once behind the flag below:

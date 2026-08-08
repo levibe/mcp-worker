@@ -23,7 +23,7 @@ const SECRET = 'test-cookie-secret'
  */
 const signedCookie = async (
 	approvedClients: unknown[],
-	encode: (payload: string) => string = encodeBase64Utf8
+	encode: (payload: string) => string = encodeBase64Utf8,
 ): Promise<string> => {
 	const payload = JSON.stringify(approvedClients)
 	const key = await crypto.subtle.importKey(
@@ -31,7 +31,7 @@ const signedCookie = async (
 		new TextEncoder().encode(SECRET),
 		{ hash: 'SHA-256', name: 'HMAC' },
 		false,
-		['sign']
+		['sign'],
 	)
 	const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload))
 	const signatureHex = Array.from(new Uint8Array(signature))
@@ -55,7 +55,7 @@ const requestWithCookie = (value: string): Request =>
  */
 const renderWith = async (
 	client: Partial<ClientInfo>,
-	server: { name: string; logo?: string } = { name: 'Test Server' }
+	server: { name: string; logo?: string } = { name: 'Test Server' },
 ): Promise<string> => {
 	const response = renderApprovalDialog(new Request('https://mcp.example.com/authorize'), {
 		client: { clientId: 'test-client', ...client } as ClientInfo,
@@ -246,9 +246,9 @@ describe('parseRedirectApproval', () => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => {})
 
 		await expect(
-			parseRedirectApproval(approvalRequest({ oauthReqInfo: { clientId: 5 } }), SECRET)
+			parseRedirectApproval(approvalRequest({ oauthReqInfo: { clientId: 5 } }), SECRET),
 		).rejects.toThrow(
-			'Failed to parse approval form: Could not extract clientId from state object.'
+			'Failed to parse approval form: Could not extract clientId from state object.',
 		)
 		expect(error).toHaveBeenCalledWith('Error processing form submission:', expect.any(Error))
 	})
@@ -259,7 +259,7 @@ describe('parseRedirectApproval', () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {})
 
 		await expect(parseRedirectApproval(approvalRequest(null), SECRET)).rejects.toThrow(
-			'Failed to parse approval form: Could not extract clientId from state object.'
+			'Failed to parse approval form: Could not extract clientId from state object.',
 		)
 	})
 
