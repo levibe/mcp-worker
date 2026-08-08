@@ -1,0 +1,15 @@
+{
+	"$schema": "./node_modules/oxfmt/configuration_schema.json",
+	"useTabs": true,
+	"singleQuote": true,
+	"semi": false,
+	"ignorePatterns": [
+		"node_modules",
+		"dist",
+		"build",
+		"coverage",
+		"pnpm-lock.yaml",
+		".worktrees/",
+		"**/.claude/worktrees/"
+	]
+}
