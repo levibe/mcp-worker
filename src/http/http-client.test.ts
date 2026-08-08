@@ -44,7 +44,7 @@ const unreadableResponse = (status: number) =>
 				controller.error(new TypeError('body stream error'))
 			},
 		}),
-		{ status }
+		{ status },
 	)
 
 const redirectResponse = (status: number, location?: string) =>
@@ -78,7 +78,7 @@ const stubUnanswered = () =>
 				init.signal.addEventListener('abort', () => {
 					reject(new DOMException('The operation was aborted', 'AbortError'))
 				})
-			})
+			}),
 	)
 
 /**
@@ -144,7 +144,7 @@ describe('request', () => {
 		await http.request('GET', '/tickets.json')
 
 		expect(sent(fetchMock).headers.Authorization).toBe(
-			`Basic ${btoa('agent@example.com/token:secret-token')}`
+			`Basic ${btoa('agent@example.com/token:secret-token')}`,
 		)
 	})
 
@@ -184,7 +184,7 @@ describe('request', () => {
 		stubFetch(async () => failedResponse(404, '{"error":"RecordNotFound"}'))
 
 		await expect(http.request('GET', '/tickets/42.json')).rejects.toThrow(
-			'Zendesk request failed: Zendesk API Error: 404 - {"error":"RecordNotFound"}'
+			'Zendesk request failed: Zendesk API Error: 404 - {"error":"RecordNotFound"}',
 		)
 	})
 
@@ -205,7 +205,7 @@ describe('request', () => {
 			async () =>
 				new Response('<html>maintenance</html>', {
 					headers: { 'content-type': 'application/json' },
-				})
+				}),
 		)
 
 		const failure = http.request('GET', '/tickets.json')
@@ -244,7 +244,7 @@ describe('request', () => {
 			await expect(failure).rejects.toBeInstanceOf(HttpRequestError)
 			await expect(failure).rejects.toHaveProperty('status', status)
 			await expect(failure).rejects.toHaveProperty('retryAfterMs', 3_000)
-		}
+		},
 	)
 
 	it('leaves the status unset when the request never got an answer', async () => {
@@ -270,7 +270,7 @@ describe('request', () => {
 
 		await expect(http.request('GET', '/tickets/42.json')).rejects.toHaveProperty(
 			'cause.message',
-			'Zendesk API Error: 404 - {"error":"RecordNotFound"}'
+			'Zendesk API Error: 404 - {"error":"RecordNotFound"}',
 		)
 	})
 })
@@ -298,7 +298,7 @@ describe('a redirect', () => {
 		stubFetch(async () => redirectResponse(301, 'https://renamed.zendesk.com/api/v2/tickets.json'))
 
 		await expect(http.request('GET', '/tickets.json')).rejects.toThrow(
-			/redirected to renamed\.zendesk\.com\..*does not survive a hop to another host.*update ZENDESK_SUBDOMAIN/s
+			/redirected to renamed\.zendesk\.com\..*does not survive a hop to another host.*update ZENDESK_SUBDOMAIN/s,
 		)
 	})
 
@@ -322,7 +322,7 @@ describe('a redirect', () => {
 		stubFetch(async () => redirectResponse(307, '/api/v2/tickets.json?page=2'))
 
 		await expect(http.request('GET', '/tickets.json')).rejects.toThrow(
-			'redirected to /api/v2/tickets.json on the same host'
+			'redirected to /api/v2/tickets.json on the same host',
 		)
 	})
 
@@ -330,7 +330,7 @@ describe('a redirect', () => {
 		stubFetch(async () => redirectResponse(302))
 
 		await expect(http.request('GET', '/tickets.json')).rejects.toThrow(
-			'redirected without naming a destination'
+			'redirected without naming a destination',
 		)
 	})
 
@@ -344,7 +344,7 @@ describe('a redirect', () => {
 	// request that never completed. 3xx is not in the retryable set, so it is asked once.
 	it('is not retried', async () => {
 		const fetchMock = stubFetch(async () =>
-			redirectResponse(301, 'https://renamed.zendesk.com/api/v2/tickets.json')
+			redirectResponse(301, 'https://renamed.zendesk.com/api/v2/tickets.json'),
 		)
 
 		await expect(http.requestWithRetry('GET', '/tickets.json')).rejects.toThrow('redirected to')
@@ -359,7 +359,7 @@ describe('the 30 second timeout', () => {
 
 		const attempt = http.request('GET', '/tickets.json')
 		const rejects = expect(attempt).rejects.toThrow(
-			'Zendesk request failed: The operation was aborted'
+			'Zendesk request failed: The operation was aborted',
 		)
 
 		await vi.advanceTimersByTimeAsync(29_999)
@@ -413,7 +413,7 @@ describe('requestWithRetry', () => {
 			await rejects
 
 			expect(fetchMock).toHaveBeenCalledTimes(3)
-		}
+		},
 	)
 
 	/**
@@ -511,11 +511,11 @@ describe('requestWithRetry', () => {
 			async () =>
 				new Response('<html>maintenance</html>', {
 					headers: { 'content-type': 'application/json' },
-				})
+				}),
 		)
 
 		await expect(http.requestWithRetry('GET', '/tickets.json')).rejects.toThrow(
-			'Zendesk answered 200 with a body that is not valid JSON'
+			'Zendesk answered 200 with a body that is not valid JSON',
 		)
 
 		expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -531,7 +531,7 @@ describe('requestWithRetry', () => {
 		const fetchMock = stubFetch(async () => unreadableResponse(400))
 
 		await expect(http.requestWithRetry('GET', '/tickets.json')).rejects.toThrow(
-			'Zendesk API Error: 400'
+			'Zendesk API Error: 400',
 		)
 
 		expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -544,7 +544,7 @@ describe('requestWithRetry', () => {
 		const fetchMock = stubFetch(async () => failedResponse(status, 'refused'))
 
 		await expect(http.requestWithRetry('GET', '/tickets.json')).rejects.toThrow(
-			`Zendesk API Error: ${status}`
+			`Zendesk API Error: ${status}`,
 		)
 		expect(fetchMock).toHaveBeenCalledTimes(1)
 	})
@@ -554,11 +554,11 @@ describe('requestWithRetry', () => {
 	// from the status itself. It reads `status` now, so the body can say whatever it likes.
 	it('does not retry a 400 whose body happens to mention 502', async () => {
 		const fetchMock = stubFetch(async () =>
-			failedResponse(400, '{"description":"upstream returned 502 earlier"}')
+			failedResponse(400, '{"description":"upstream returned 502 earlier"}'),
 		)
 
 		await expect(http.requestWithRetry('GET', '/tickets.json')).rejects.toThrow(
-			'Zendesk API Error: 400'
+			'Zendesk API Error: 400',
 		)
 
 		expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -624,8 +624,8 @@ describe('requestWithRetry', () => {
 		const fetchMock = stubFetch(
 			() =>
 				new Promise<Response>((resolve) =>
-					setTimeout(() => resolve(failedResponse(503, 'unavailable')), 29_000)
-				)
+					setTimeout(() => resolve(failedResponse(503, 'unavailable')), 29_000),
+				),
 		)
 
 		const attempt = http.requestWithRetry('GET', '/tickets.json')
@@ -751,7 +751,7 @@ describe('Retry-After', () => {
 
 		await expect(http.request('GET', '/tickets.json')).rejects.toHaveProperty(
 			'retryAfterMs',
-			30_000
+			30_000,
 		)
 	})
 
@@ -809,7 +809,7 @@ describe('Retry-After', () => {
 		const fetchMock = stubFetch(async () => rateLimited('60'))
 
 		await expect(http.requestWithRetry('GET', '/tickets.json')).rejects.toThrow(
-			'Zendesk API Error: 429'
+			'Zendesk API Error: 429',
 		)
 
 		expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -825,7 +825,7 @@ describe('Retry-After', () => {
 		const fetchMock = stubFetch(async () => rateLimited('29'))
 
 		await expect(http.requestWithRetry('GET', '/tickets.json')).rejects.toThrow(
-			'Zendesk API Error: 429'
+			'Zendesk API Error: 429',
 		)
 
 		expect(fetchMock).toHaveBeenCalledTimes(1)

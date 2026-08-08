@@ -39,7 +39,7 @@ type StubbedServer = ReturnType<typeof stubServer>
 const register = (
 	server: StubbedServer,
 	tools: ToolDefinition<StubClient>[],
-	ceiling: DeclarableLevel = 'delete'
+	ceiling: DeclarableLevel = 'delete',
 ) => registerTools(server as unknown as McpServer, stubClient, tools, ceiling)
 
 const publishedBy = (server: StubbedServer): string[] =>
@@ -69,7 +69,7 @@ describe('registerTools', () => {
 		register(
 			server,
 			[levelledTool('list_macros', 'read'), levelledTool('create_macro', 'stage')],
-			'stage'
+			'stage',
 		)
 
 		expect(publishedBy(server)).toEqual(['list_macros', 'create_macro'])
@@ -81,7 +81,7 @@ describe('registerTools', () => {
 		register(
 			server,
 			[levelledTool('create_ticket', 'write'), levelledTool('delete_ticket', 'delete')],
-			'stage'
+			'stage',
 		)
 
 		expect(server.registerTool).not.toHaveBeenCalled()
@@ -97,7 +97,7 @@ describe('registerTools', () => {
 	] as const)('a %s ceiling publishes exactly the levels under it', (ceiling, published) => {
 		const server = stubServer()
 		const tools = (['read', 'stage', 'write', 'delete'] as const).map((level) =>
-			levelledTool(`${level}_tool`, level)
+			levelledTool(`${level}_tool`, level),
 		)
 
 		register(server, tools, ceiling)
@@ -113,7 +113,7 @@ describe('registerTools', () => {
 				levelledTool('delete_macro', 'delete'),
 				levelledTool('create_ticket', 'write'),
 			],
-			'stage'
+			'stage',
 		)
 
 		expect(withheld).toEqual(['delete_macro', 'create_ticket'])
@@ -133,7 +133,7 @@ describe('registerTools', () => {
 		expect(server.registerTool).toHaveBeenCalledWith(
 			'list_macros',
 			expect.objectContaining({ description: tool.description }),
-			expect.any(Function)
+			expect.any(Function),
 		)
 	})
 
@@ -147,7 +147,7 @@ describe('registerTools', () => {
 			'read',
 			'List macros',
 			{ page: z.number().optional() },
-			async () => ({})
+			async () => ({}),
 		)
 
 		register(server, [tool])
@@ -186,13 +186,13 @@ describe('registerTools', () => {
 			'Create a macro',
 			{},
 			async () => created,
-			'Macro created successfully!'
+			'Macro created successfully!',
 		)
 
 		register(server, [tool])
 
 		expect(textOf(await handlerRegisteredBy(server)())).toBe(
-			`Macro created successfully!\n\n${JSON.stringify(created)}`
+			`Macro created successfully!\n\n${JSON.stringify(created)}`,
 		)
 	})
 
@@ -208,7 +208,7 @@ describe('registerTools', () => {
 			async () => {
 				throw new Error('Zendesk API Error: 422 - RecordInvalid')
 			},
-			'Macro created successfully!'
+			'Macro created successfully!',
 		)
 
 		register(server, [tool])
@@ -231,7 +231,7 @@ describe('registerAllTools', () => {
 			server as unknown as McpServer,
 			stubClient,
 			{ widgets: [levelledTool('list_widgets', 'read'), levelledTool('create_widget', 'stage')] },
-			{}
+			{},
 		)
 
 		expect(publishedBy(server)).toEqual(['list_widgets'])
@@ -252,7 +252,7 @@ describe('announceWithheldTools', () => {
 	it('says so when the ceilings withhold nothing', () => {
 		announceWithheldTools(
 			{ reads: [levelledTool('list_macros', 'read')] },
-			{ ceilings: { reads: 'read' } }
+			{ ceilings: { reads: 'read' } },
 		)
 
 		expect(log).toHaveBeenCalledWith(expect.stringContaining('Withholding nothing'))
@@ -264,7 +264,7 @@ describe('announceWithheldTools', () => {
 	it('counts a group the ceilings never named as withheld above read', () => {
 		announceWithheldTools(
 			{ widgets: [levelledTool('list_widgets', 'read'), levelledTool('create_widget', 'stage')] },
-			{ ceilings: {} }
+			{ ceilings: {} },
 		)
 
 		expect(log).toHaveBeenCalledWith(expect.stringContaining('create_widget'))

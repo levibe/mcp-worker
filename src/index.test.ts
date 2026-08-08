@@ -38,7 +38,7 @@ const toolCategories = {
 }
 
 const workerOptions = (
-	over: Partial<McpWorkerOptions<StubEnv, StubClient>> = {}
+	over: Partial<McpWorkerOptions<StubEnv, StubClient>> = {},
 ): McpWorkerOptions<StubEnv, StubClient> => ({
 	server: { name: 'Widget Server', version: '1.0.0' },
 	toolCategories,
@@ -67,7 +67,7 @@ const fetchOnce = (route = '/mcp') =>
 	providerConfig().apiHandlers[route].fetch(
 		new Request(`http://localhost${route}`),
 		env,
-		{} as ExecutionContext
+		{} as ExecutionContext,
 	)
 
 beforeEach(() => {
@@ -146,7 +146,7 @@ describe('the provider config', () => {
 				refreshTokenTTL: 31_536_000,
 				clientRegistrationTTL: 1_000,
 				cacheHints: { 'tools/list': { ttlMs: 60_000, cacheScope: 'private' } },
-			})
+			}),
 		)
 
 		const config = providerConfig()

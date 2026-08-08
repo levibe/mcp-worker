@@ -16,11 +16,11 @@ import type { ZodRawShape } from 'zod'
 export const requireChanges = (
 	toolName: string,
 	schema: ZodRawShape,
-	changes: Record<string, unknown>
+	changes: Record<string, unknown>,
 ): void => {
 	if (Object.keys(changes).length > 0) return
 
 	throw new Error(
-		`${toolName} needs at least one field to change: ${Object.keys(schema).join(', ')}.`
+		`${toolName} needs at least one field to change: ${Object.keys(schema).join(', ')}.`,
 	)
 }

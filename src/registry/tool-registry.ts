@@ -27,7 +27,7 @@ export const registerTools = <C>(
 	server: McpServer,
 	client: C,
 	tools: ToolDefinition<C>[],
-	ceiling: DeclarableLevel
+	ceiling: DeclarableLevel,
 ): string[] => {
 	const withheld: string[] = []
 
@@ -48,7 +48,7 @@ export const registerTools = <C>(
 		server.registerTool(
 			tool.name,
 			{ description: tool.description, inputSchema: z.object(tool.schema) },
-			withErrorHandling(tool.handler.bind(null, client), tool.successMessage)
+			withErrorHandling(tool.handler.bind(null, client), tool.successMessage),
 		)
 	})
 
@@ -71,10 +71,10 @@ export const registerAllTools = <C>(
 	server: McpServer,
 	client: C,
 	toolCategories: Record<string, ToolDefinition<C>[]>,
-	ceilings: ResolvedCeilings['ceilings']
+	ceilings: ResolvedCeilings['ceilings'],
 ): string[] =>
 	Object.entries(toolCategories).flatMap(([group, tools]) =>
-		registerTools(server, client, tools, ceilingFor(ceilings, group))
+		registerTools(server, client, tools, ceilingFor(ceilings, group)),
 	)
 
 /**
@@ -93,7 +93,7 @@ export const registerAllTools = <C>(
  */
 export const announceWithheldTools = <C>(
 	toolCategories: Record<string, ToolDefinition<C>[]>,
-	resolved: ResolvedCeilings
+	resolved: ResolvedCeilings,
 ): void => {
 	const ceilingsNamed = Object.entries(resolved.ceilings)
 		.map(([group, ceiling]) => `${group}=${ceiling}`)
@@ -102,7 +102,7 @@ export const announceWithheldTools = <C>(
 	const withheld = Object.entries(toolCategories).flatMap(([group, tools]) =>
 		tools
 			.filter((tool) => !isWithinCeiling(tool.level, ceilingFor(resolved.ceilings, group)))
-			.map((tool) => tool.name)
+			.map((tool) => tool.name),
 	)
 
 	const withholding =
@@ -150,7 +150,7 @@ export const toolFactory =
 		description: string,
 		schema: S,
 		handler: (client: C, params: InferParams<S>) => Promise<unknown>,
-		successMessage?: string
+		successMessage?: string,
 	): ToolDefinition<C> => ({
 		name,
 		level,

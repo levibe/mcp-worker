@@ -30,7 +30,7 @@ describe('withErrorHandling', () => {
 		const handler = withErrorHandling(async () => ({ id: 42 }), 'Ticket created successfully!')
 
 		expect(textOf(await handler())).toBe(
-			`Ticket created successfully!\n\n${JSON.stringify({ id: 42 })}`
+			`Ticket created successfully!\n\n${JSON.stringify({ id: 42 })}`,
 		)
 	})
 

@@ -78,9 +78,11 @@ export default tseslint.config(
 		},
 	},
 	// Must stay last so it switches off every formatting rule enabled above and
-	// leaves Prettier as the only thing with an opinion about layout.
+	// leaves the external formatter as the only thing with an opinion about layout.
+	// Named eslint-config-prettier for historical reasons; all it does is disable
+	// ESLint's own stylistic rules, which is what you want behind oxfmt too.
 	prettier,
 	{
 		ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.js', '*.mjs', '*.cjs', '*.d.ts'],
-	}
+	},
 )

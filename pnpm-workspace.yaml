@@ -53,7 +53,9 @@ minimumReleaseAgeExclude:
 # pnpm 11 fails the install outright (ERR_PNPM_IGNORED_BUILDS) unless every
 # package with an install script is answered here; the pnpm 10 this repo pins
 # skips unanswered scripts with a warning instead, so the answers matter on
-# both. esbuild arrives with vitest and fetches a prebuilt platform binary.
+# both. esbuild arrives with vitest and fetches a prebuilt platform binary,
+# and lefthook (the pre-push hook runner) does the same: it ships the binaries
+# as optional deps and its postinstall links the one for this platform.
 #
 # core-js-pure is denied rather than permitted, and it is the one entry here
 # that is not a build at all: its postinstall prints a funding notice and
@@ -63,6 +65,7 @@ minimumReleaseAgeExclude:
 allowBuilds:
   core-js-pure: false
   esbuild: true
+  lefthook: true
 
 # Reinstall when node_modules has drifted from the lockfile, rather than only
 # complaining. This repo has no pre-commit hooks, so it is the only local

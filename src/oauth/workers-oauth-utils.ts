@@ -59,7 +59,7 @@ async function importKey(secret: string): Promise<CryptoKey> {
 		enc.encode(secret),
 		{ hash: 'SHA-256', name: 'HMAC' },
 		false, // not extractable
-		['sign', 'verify'] // key usages
+		['sign', 'verify'], // key usages
 	)
 }
 
@@ -88,13 +88,13 @@ async function signData(key: CryptoKey, data: string): Promise<string> {
 async function verifySignature(
 	key: CryptoKey,
 	signatureHex: string,
-	data: string
+	data: string,
 ): Promise<boolean> {
 	const enc = new TextEncoder()
 	try {
 		// Convert hex signature back to ArrayBuffer
 		const signatureBytes = new Uint8Array(
-			signatureHex.match(/.{1,2}/g)!.map((byte) => Number.parseInt(byte, 16))
+			signatureHex.match(/.{1,2}/g)!.map((byte) => Number.parseInt(byte, 16)),
 		)
 		return await crypto.subtle.verify('HMAC', key, signatureBytes.buffer, enc.encode(data))
 	} catch (e) {
@@ -112,7 +112,7 @@ async function verifySignature(
  */
 async function getApprovedClientsFromCookie(
 	cookieHeader: string | null,
-	secret: string
+	secret: string,
 ): Promise<string[] | null> {
 	if (!cookieHeader) return null
 
@@ -195,7 +195,7 @@ async function getApprovedClientsFromCookie(
 export async function clientIdAlreadyApproved(
 	request: Request,
 	clientId: string,
-	cookieSecret: string
+	cookieSecret: string,
 ): Promise<boolean> {
 	if (!clientId) return false
 	const cookieHeader = request.headers.get('Cookie')
@@ -595,7 +595,7 @@ export interface ParsedApprovalResult {
  */
 export async function parseRedirectApproval(
 	request: Request,
-	cookieSecret: string
+	cookieSecret: string,
 ): Promise<ParsedApprovalResult> {
 	if (request.method !== 'POST') {
 		throw new Error('Invalid request method. Expected POST.')
