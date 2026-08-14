@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-08-14
+
+### Added
+
+- `route` accepts a string array, mounting the MCP endpoint on several paths at once; `['/mcp', '/']` keeps the canonical path and also answers at the bare subdomain root, so a dedicated `mcp.*` subdomain needs no `/mcp` suffix. Overlapping routes sort most-specific-first, and an empty array throws.
+
 ## [0.2.0] - 2026-08-07
 
 ### Changed
