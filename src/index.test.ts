@@ -201,6 +201,20 @@ describe('the route and the origin allowlist', () => {
 		expect(handlerOptions.route).toBe('/')
 	})
 
+	it('rejects an empty route array rather than silently dropping the endpoint', () => {
+		expect(() => createMcpWorker(workerOptions({ route: [] }))).toThrow(TypeError)
+	})
+
+	// The provider returns the first apiHandler whose route prefix-matches (every route but '/',
+	// which it matches exactly), so a prefix offered before the longer path it prefixes would
+	// shadow it — the request lands on the prefix's handler, whose inner exact-match then 404s
+	// the longer path. Offering the more specific route first is what stops that.
+	it('orders overlapping routes most-specific-first so a prefix cannot shadow', () => {
+		createMcpWorker(workerOptions({ route: ['/mcp', '/mcp/tools'] }))
+
+		expect(Object.keys(providerConfig().apiHandlers)).toEqual(['/mcp/tools', '/mcp'])
+	})
+
 	it('passes allowedOriginHostnames through when given', async () => {
 		createMcpWorker(workerOptions({ allowedOriginHostnames: ['app.example.com'] }))
 

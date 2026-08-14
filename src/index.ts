@@ -98,7 +98,18 @@ export const createMcpWorker = <TEnv extends GoogleHandlerSecrets, C>(
 ): OAuthProvider<TEnv> => {
 	let announced = false
 
-	const routes = Array.isArray(options.route) ? options.route : [options.route ?? '/mcp']
+	// Normalized to an array and sorted most-specific-first. The OAuth provider returns the first
+	// apiHandler whose route prefix-matches (every route but '/', which it matches exactly), so a
+	// shorter route offered ahead of a longer path it prefixes would shadow it — the request would
+	// land on the prefix's handler and its inner exact-match would 404 the longer path. Longest
+	// first prevents that; '/' never shadows anything, so it simply sorts last. `.slice()` keeps
+	// the sort from mutating a caller's array.
+	const routes = (Array.isArray(options.route) ? options.route : [options.route ?? '/mcp'])
+		.slice()
+		.sort((a, b) => b.length - a.length)
+	if (routes.length === 0) {
+		throw new TypeError('route must include at least one path')
+	}
 	const cacheHints = options.cacheHints ?? {
 		'tools/list': { ttlMs: 300_000, cacheScope: 'private' },
 	}
