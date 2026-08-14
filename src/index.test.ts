@@ -179,6 +179,28 @@ describe('the route and the origin allowlist', () => {
 		expect(handlerOptions.route).toBe('/api/mcp')
 	})
 
+	// A dedicated mcp.* subdomain makes the '/mcp' path redundant, so a deployment can mount the
+	// endpoint at several paths at once — typically the canonical '/mcp' plus a bare '/' alias, so
+	// the subdomain root is itself a working MCP endpoint. Each path needs its own apiHandlers key
+	// and its own inner route, or the half it missed 404s.
+	it('mounts an apiHandler at every route when given an array', () => {
+		createMcpWorker(workerOptions({ route: ['/mcp', '/'] }))
+
+		expect(Object.keys(providerConfig().apiHandlers)).toEqual(['/mcp', '/'])
+	})
+
+	it('hands each route its own inner route so the exact-match agrees', async () => {
+		createMcpWorker(workerOptions({ route: ['/mcp', '/'] }))
+
+		await fetchOnce('/')
+
+		const [, handlerOptions] = handlerMock.mock.calls[0] as unknown as [
+			unknown,
+			Record<string, unknown>,
+		]
+		expect(handlerOptions.route).toBe('/')
+	})
+
 	it('passes allowedOriginHostnames through when given', async () => {
 		createMcpWorker(workerOptions({ allowedOriginHostnames: ['app.example.com'] }))
 

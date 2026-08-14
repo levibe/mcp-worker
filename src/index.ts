@@ -30,11 +30,17 @@ export interface McpWorkerOptions<TEnv extends GoogleHandlerSecrets, C> {
 	 */
 	refreshTokenTTL?: number
 	/**
-	 * Default '/mcp'. Used in both places it has to agree with itself — the `apiHandlers` key
-	 * on the OAuth provider and `createMcpHandler`'s own route match — because a route
-	 * half-applied 404s the endpoint.
+	 * Which path the MCP endpoint answers on. Default '/mcp'. Whatever is passed reaches two
+	 * places that must agree — the `apiHandlers` key on the OAuth provider and
+	 * `createMcpHandler`'s own exact route match — because a route half-applied 404s the endpoint.
+	 *
+	 * An array mounts the same endpoint on several paths at once. The usual reason is a dedicated
+	 * mcp.* subdomain, where the '/mcp' suffix is redundant: `['/mcp', '/']` keeps the canonical
+	 * path working while also answering at the bare subdomain root, so a client can be pointed at
+	 * the subdomain itself. The provider matches '/' exactly rather than as a prefix, so a root
+	 * mount does not shadow '/authorize', '/token', '/register' or the OAuth metadata.
 	 */
-	route?: string
+	route?: string | string[]
 	/**
 	 * Passed through to `createMcpHandler`. A request with no Origin header always passes, so
 	 * this only decides which browsers may call the endpoint — the default permits localhost
@@ -92,7 +98,7 @@ export const createMcpWorker = <TEnv extends GoogleHandlerSecrets, C>(
 ): OAuthProvider<TEnv> => {
 	let announced = false
 
-	const route = options.route ?? '/mcp'
+	const routes = Array.isArray(options.route) ? options.route : [options.route ?? '/mcp']
 	const cacheHints = options.cacheHints ?? {
 		'tools/list': { ttlMs: 300_000, cacheScope: 'private' },
 	}
@@ -111,7 +117,7 @@ export const createMcpWorker = <TEnv extends GoogleHandlerSecrets, C>(
 	 * would land `env` in the options argument. Calling the handler itself, which does take the
 	 * three, is what keeps `ctx.props` reaching `getMcpAuthContext()` inside a tool.
 	 */
-	const mcpHandler = {
+	const makeMcpHandler = (handlerRoute: string) => ({
 		fetch: (request: Request, env: TEnv, ctx: ExecutionContext): Promise<Response> => {
 			// Resolved once per request, like the server itself — it is a small parse of a small
 			// object, and per-request is what keeps a config-only deploy taking effect without a
@@ -134,18 +140,16 @@ export const createMcpWorker = <TEnv extends GoogleHandlerSecrets, C>(
 			}
 
 			return createMcpHandler(() => createServer(env, resolved.ceilings), {
-				route,
+				route: handlerRoute,
 				...(options.allowedOriginHostnames !== undefined
 					? { allowedOriginHostnames: options.allowedOriginHostnames }
 					: {}),
 			})(request, env, ctx)
 		},
-	}
+	})
 
 	return new OAuthProvider({
-		apiHandlers: {
-			[route]: mcpHandler,
-		},
+		apiHandlers: Object.fromEntries(routes.map((r) => [r, makeMcpHandler(r)])),
 		authorizeEndpoint: '/authorize',
 		clientRegistrationEndpoint: '/register',
 		defaultHandler: createGoogleHandler({ server: options.approvalDialog }),
