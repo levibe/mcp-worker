@@ -39,6 +39,17 @@ export interface McpWorkerOptions<TEnv extends GoogleHandlerSecrets, C> {
 	 * path working while also answering at the bare subdomain root, so a client can be pointed at
 	 * the subdomain itself. The provider matches '/' exactly rather than as a prefix, so a root
 	 * mount does not shadow '/authorize', '/token', '/register' or the OAuth metadata.
+	 *
+	 * One caveat, established by testing against the live product: a bare root works for clients
+	 * you drive yourself — mcp-remote, the Inspector, an SDK client — but not for Claude's hosted
+	 * connector. That connector derives the OAuth resource from the exact URL it is given, so a
+	 * bare-origin URL ('https://host', no path) yields a bare-origin resource; the connector runs
+	 * the whole OAuth exchange and then does not open an MCP session against it. Redirecting '/' to
+	 * '/mcp' does not rescue it either — the connector follows the redirect but still keys the
+	 * resource off the URL that was entered. So the bare root is a convenience for clients you
+	 * control; a Claude connector has to be given the '/mcp' URL, and no server-side setting
+	 * changes that. Prefer a single '/mcp' route unless a self-driven client actually needs the
+	 * root alias.
 	 */
 	route?: string | string[]
 	/**
