@@ -78,12 +78,49 @@ export interface GoogleHandlerOptions {
 	/** Shown on the approval dialog — the product identity, which is the only thing in this
 	 *  flow that is the app's rather than the mechanism's. */
 	server: { name: string; description?: string; logo?: string }
+	/**
+	 * When true, a blank or unset ALLOWED_EMAILS refuses every sign-in rather than admitting
+	 * everyone. The package default stays opt-in because a consumer may legitimately run an
+	 * unrestricted gate; a deployment whose tools read someone's whole mailbox states this
+	 * and gets a misconfiguration answered as an outage instead of an open door.
+	 */
+	requireAllowedEmails?: boolean
 }
+
+/**
+ * ALLOWED_EMAILS as compared: entries trimmed, lowercased, empties dropped. One parser for
+ * the requireAllowedEmails check and the callback gate, so the two cannot drift on what
+ * counts as a configured list.
+ */
+const parseAllowedEmails = (raw: string | undefined): string[] =>
+	(raw ?? '')
+		.split(',')
+		.map((entry) => entry.trim().toLowerCase())
+		.filter((entry) => entry !== '')
 
 export const createGoogleHandler = (options: GoogleHandlerOptions) => {
 	const app = new Hono<{ Bindings: GoogleHandlerEnv }>()
 
+	/**
+	 * The requireAllowedEmails refusal, asked at both doors: /authorize so a misconfigured
+	 * deployment refuses before anyone is sent to Google, and /callback so a flow already in
+	 * flight when the secret was cleared cannot land past the gate. Logged per affected
+	 * request, the way a fallen-closed TOOL_CEILINGS is, because the caller's fixed sentence
+	 * deliberately says nothing an unauthenticated stranger could use.
+	 */
+	const refuseUnconfiguredAllowlist = (c: Context<{ Bindings: GoogleHandlerEnv }>) => {
+		if (!options.requireAllowedEmails || parseAllowedEmails(c.env.ALLOWED_EMAILS).length > 0) {
+			return undefined
+		}
+		console.error(
+			'ALLOWED_EMAILS is unset or blank and this deployment requires it; refusing sign-in',
+		)
+		return c.text('Server misconfigured: sign-in is unavailable', 503)
+	}
+
 	app.get('/authorize', async (c) => {
+		const refused = refuseUnconfiguredAllowlist(c)
+		if (refused) return refused
 		// parseAuthRequest rejects an unregistered client, a redirect URI that doesn't match
 		// the registration, and dangerous redirect schemes. It signals all of these by throwing,
 		// so without this catch they surface as a bare 500 that tells the client nothing.
@@ -224,6 +261,9 @@ export const createGoogleHandler = (options: GoogleHandlerOptions) => {
 	 * and is what a tool can later read through `getMcpAuthContext()` — see `Props` in ./upstream.
 	 */
 	app.get('/callback', async (c) => {
+		const refused = refuseUnconfiguredAllowlist(c)
+		if (refused) return refused
+
 		// The `state` here is what redirectToGoogle minted: the authorization request plus a nonce,
 		// base64 of JSON and still neither signed nor encrypted. It does not need to be. What the
 		// OAuth `state` parameter exists to do is bind the callback to the browser that started the
@@ -342,10 +382,35 @@ export const createGoogleHandler = (options: GoogleHandlerOptions) => {
 			return c.text(`Failed to fetch user info: ${await userResponse.text()}`, 500)
 		}
 
-		const { id, name, email } = (await userResponse.json()) as {
+		const {
+			id,
+			name,
+			email,
+			verified_email: verifiedEmail,
+		} = (await userResponse.json()) as {
 			id: string
 			name: string
 			email: string
+			verified_email?: boolean
+		}
+
+		// Refuse an address Google has not confirmed the signer-in owns.
+		//
+		// Both gates below compare this string, and it rides into `props` as the caller's
+		// identity, so it is the one value in this flow an access control cannot take on trust.
+		// Google does not promise the address is one the account proved it owns: a Workspace or
+		// Cloud Identity tenant on a domain whose ownership is still unverified can carry any
+		// local part at that domain, and Google reports `verified_email: false` for it. Their
+		// own guidance is not to treat the address as an identifier until the flag is true.
+		//
+		// Compared against `true` rather than tested for falsiness, so a response that stops
+		// carrying the field refuses everyone rather than admitting everyone — for a gate that
+		// is the right side to fail on, and it fails loudly enough to be noticed. The caller
+		// gets a fixed sentence and the reason goes to the log, matching how the rest of this
+		// file answers an unauthenticated caller.
+		if (verifiedEmail !== true) {
+			console.warn(`Google reported the address as unverified; refusing sign-in for '${email}'`)
+			return c.text('This account is not authorized', 403)
 		}
 
 		// Enforce domain restriction if HOSTED_DOMAIN is set.
@@ -367,10 +432,11 @@ export const createGoogleHandler = (options: GoogleHandlerOptions) => {
 		// Enforce the exact-address allowlist if ALLOWED_EMAILS is set.
 		//
 		// It runs after the domain check, so when both are set a sign-in has to clear both, the
-		// domain first. Entries are trimmed and empty ones dropped before the list is judged
-		// non-empty — a human edits this secret by hand, and a stray space or trailing comma
-		// must neither refuse everyone nor quietly admit the empty string. A value that is
-		// blank once parsed means no restriction, the same as unset.
+		// domain first. `parseAllowedEmails` trims entries and drops empty ones before the list
+		// is judged non-empty — a human edits this secret by hand, and a stray space or trailing
+		// comma must neither refuse everyone nor quietly admit the empty string. A value that is
+		// blank once parsed means no restriction, the same as unset (unless requireAllowedEmails
+		// already refused above).
 		//
 		// Both sides are lowercased for the same reason as the domain above: Google hands back
 		// a lowercase address in practice, and an access control should not rest on that habit.
@@ -380,10 +446,7 @@ export const createGoogleHandler = (options: GoogleHandlerOptions) => {
 		// The refusal names no addresses, unlike the domain message above. A hosted domain is
 		// an organization's public name; this list is private addresses, and an unauthenticated
 		// caller does not get it echoed back.
-		const allowedEmails = (c.env.ALLOWED_EMAILS ?? '')
-			.split(',')
-			.map((entry) => entry.trim().toLowerCase())
-			.filter((entry) => entry !== '')
+		const allowedEmails = parseAllowedEmails(c.env.ALLOWED_EMAILS)
 		if (allowedEmails.length > 0 && !allowedEmails.includes(email.toLowerCase())) {
 			return c.text('This account is not authorized', 403)
 		}

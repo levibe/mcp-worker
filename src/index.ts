@@ -21,6 +21,12 @@ export interface McpWorkerOptions<TEnv extends GoogleHandlerSecrets, C> {
 	/** The approval dialog's product identity — see `GoogleHandlerOptions`. */
 	approvalDialog: { name: string; description?: string; logo?: string }
 	/**
+	 * When true, a blank or unset ALLOWED_EMAILS refuses every sign-in instead of admitting
+	 * anyone — see `GoogleHandlerOptions`. State it on a deployment whose tools are not for
+	 * strangers, so a missing secret is an outage rather than an open door.
+	 */
+	requireAllowedEmails?: boolean
+	/**
 	 * Ninety days unless the deployment says otherwise. How long a refresh token lives is a
 	 * risk-posture decision — the token is the only revocation there is for a server whose
 	 * upstream identity is never re-checked — so the default is a moderate middle between the
@@ -174,7 +180,10 @@ export const createMcpWorker = <TEnv extends GoogleHandlerSecrets, C>(
 		apiHandlers: Object.fromEntries(routes.map((r) => [r, makeMcpHandler(r)])),
 		authorizeEndpoint: '/authorize',
 		clientRegistrationEndpoint: '/register',
-		defaultHandler: createGoogleHandler({ server: options.approvalDialog }),
+		defaultHandler: createGoogleHandler({
+			server: options.approvalDialog,
+			requireAllowedEmails: options.requireAllowedEmails,
+		}),
 		clientRegistrationTTL: options.clientRegistrationTTL ?? 34_560_000,
 		refreshTokenTTL: options.refreshTokenTTL ?? 7_776_000,
 		tokenEndpoint: '/token',

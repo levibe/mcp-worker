@@ -9,6 +9,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Added
 
 - Optional `ALLOWED_EMAILS` secret on `GoogleHandlerSecrets`: comma-separated exact addresses admitted at the OAuth callback, compared case-insensitively with whitespace around entries tolerated. Unset or blank admits anyone; when `HOSTED_DOMAIN` is also set, both checks apply.
+- Optional `requireAllowedEmails` on `McpWorkerOptions`: when true, a blank or unset `ALLOWED_EMAILS` answers `/authorize` and `/callback` with a 503 instead of admitting anyone.
+
+### Changed
+
+- The OAuth callback refuses a sign-in whose userinfo `verified_email` is not `true`; both gates compare the address, so an unverified one no longer reaches them.
 
 ## [0.3.0] - 2026-08-14
 
