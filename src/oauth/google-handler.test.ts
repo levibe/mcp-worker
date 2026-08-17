@@ -712,6 +712,20 @@ describe('GET /callback', () => {
 			expect(localParseAuthRequest).not.toHaveBeenCalled()
 		})
 
+		// The approval submit must go nowhere either: a dialog rendered before the secret was
+		// cleared can still be submitted after.
+		it('refuses at POST /authorize before the approval is parsed', async () => {
+			vi.mocked(parseRedirectApproval).mockClear()
+			const response = await StrictHandler.request(
+				`${workerOrigin}/authorize`,
+				{ method: 'POST' },
+				testEnv({ OAUTH_PROVIDER: { completeAuthorization } }),
+			)
+
+			expect(response.status).toBe(503)
+			expect(parseRedirectApproval).not.toHaveBeenCalled()
+		})
+
 		it('admits a listed address exactly as the lenient handler does', async () => {
 			const response = await strictCallback(testEnv({ ALLOWED_EMAILS: 'ada@example.com' }))
 

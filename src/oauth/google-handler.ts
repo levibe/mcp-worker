@@ -102,9 +102,10 @@ export const createGoogleHandler = (options: GoogleHandlerOptions) => {
 	const app = new Hono<{ Bindings: GoogleHandlerEnv }>()
 
 	/**
-	 * The requireAllowedEmails refusal, asked at both doors: /authorize so a misconfigured
-	 * deployment refuses before anyone is sent to Google, and /callback so a flow already in
-	 * flight when the secret was cleared cannot land past the gate. Logged per affected
+	 * The requireAllowedEmails refusal, asked at every door: GET /authorize so a misconfigured
+	 * deployment refuses before anyone sees a dialog, POST /authorize so an approval submitted
+	 * after the secret was cleared still goes nowhere, and /callback so a flow already in
+	 * flight cannot land past the gate. Logged per affected
 	 * request, the way a fallen-closed TOOL_CEILINGS is, because the caller's fixed sentence
 	 * deliberately says nothing an unauthenticated stranger could use.
 	 */
@@ -155,6 +156,9 @@ export const createGoogleHandler = (options: GoogleHandlerOptions) => {
 	})
 
 	app.post('/authorize', async (c) => {
+		const refused = refuseUnconfiguredAllowlist(c)
+		if (refused) return refused
+
 		// Guarded for the same reason as the two catches in /callback, and this is the one a caller
 		// reaches most cheaply of the three: no Google sign-in, no valid cookie, nothing. A form body
 		// whose `state` is absent, is not a string, is not base64 JSON, or decodes without a
@@ -409,7 +413,8 @@ export const createGoogleHandler = (options: GoogleHandlerOptions) => {
 		// gets a fixed sentence and the reason goes to the log, matching how the rest of this
 		// file answers an unauthenticated caller.
 		if (verifiedEmail !== true) {
-			console.warn(`Google reported the address as unverified; refusing sign-in for '${email}'`)
+			// The address itself stays out of the log: a rejection path is no place to retain PII.
+			console.warn('Google reported the address as unverified; refusing sign-in')
 			return c.text('This account is not authorized', 403)
 		}
 
