@@ -95,6 +95,8 @@ interface Env {
 	COOKIE_ENCRYPTION_KEY: string
 	// Optional: restricts Google sign-in to a single hosted domain.
 	HOSTED_DOMAIN?: string
+	// Optional: restricts Google sign-in to a comma-separated list of exact addresses.
+	ALLOWED_EMAILS?: string
 }
 ```
 

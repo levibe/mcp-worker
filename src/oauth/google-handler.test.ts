@@ -422,6 +422,143 @@ describe('GET /callback', () => {
 		})
 	})
 
+	describe('ALLOWED_EMAILS', () => {
+		// The body is pinned exactly, and what it must not carry matters as much as what it
+		// does: the domain refusal above names the domain, which is an organization's public
+		// name, but this list is private addresses and none of them may ride back to an
+		// unauthenticated caller.
+		it('refuses a sign-in from an address not on the list', async () => {
+			userinfoResponse = () =>
+				Response.json({ id: 'google-user-7', name: 'Outsider', email: 'mallory@example.com' })
+
+			const response = await callback(
+				{ state: validState, code: 'google-code' },
+				testEnv({ ALLOWED_EMAILS: 'ada@example.com,grace@elsewhere.com' }),
+			)
+
+			expect(response.status).toBe(403)
+			await expect(response.text()).resolves.toBe('This account is not authorized')
+			expect(completeAuthorization).not.toHaveBeenCalled()
+		})
+
+		// Both entries, not just the first — the list spans domains, which is the point of an
+		// exact-address gate over a domain one.
+		it.each(['ada@example.com', 'grace@elsewhere.com'])(
+			'admits %s when the list names it',
+			async (email) => {
+				userinfoResponse = () => Response.json({ id: 'google-user-8', name: 'Listed', email })
+
+				const response = await callback(
+					{ state: validState, code: 'google-code' },
+					testEnv({ ALLOWED_EMAILS: 'ada@example.com,grace@elsewhere.com' }),
+				)
+
+				expect(response.status).toBe(302)
+				expect(completeAuthorization).toHaveBeenCalledOnce()
+			},
+		)
+
+		// Same reasoning as the domain matrix above: Google hands back a lowercase address in
+		// practice, and an access control should not rest on that habit. The comparison is
+		// equality on the whole address rather than a suffix, so lowercasing has no lookalike
+		// check to weaken here.
+		it.each([
+			['an address Google sent in mixed case', 'Ada@EXAMPLE.COM', 'ada@example.com'],
+			['a list written in mixed case', 'ada@example.com', 'Ada@Example.COM'],
+			['both sides in mixed case', 'ADA@Example.com', 'aDa@eXample.COM'],
+		])('admits %s', async (_label, email, allowedEmails) => {
+			userinfoResponse = () => Response.json({ id: 'google-user-9', name: 'Ada', email })
+
+			const response = await callback(
+				{ state: validState, code: 'google-code' },
+				testEnv({ ALLOWED_EMAILS: allowedEmails }),
+			)
+
+			expect(response.status).toBe(302)
+			expect(completeAuthorization).toHaveBeenCalledOnce()
+		})
+
+		// A human edits this secret by hand, so spaces around the commas are its ordinary
+		// shape rather than a malformed value.
+		it('tolerates whitespace around the commas', async () => {
+			userinfoResponse = () =>
+				Response.json({ id: 'google-user-10', name: 'Grace', email: 'grace@elsewhere.com' })
+
+			const response = await callback(
+				{ state: validState, code: 'google-code' },
+				testEnv({ ALLOWED_EMAILS: ' ada@example.com , grace@elsewhere.com ' }),
+			)
+
+			expect(response.status).toBe(302)
+			expect(completeAuthorization).toHaveBeenCalledOnce()
+		})
+
+		// Unset keeps meaning no restriction, and a blank value means the same rather than a
+		// list nobody is on: a secret cleared to '' reads as switched off, and the alternative
+		// is every sign-in refused by an empty string.
+		it.each([
+			['unset', undefined],
+			['an empty string', ''],
+			['only commas and whitespace', ' , ,'],
+		])('admits anyone when ALLOWED_EMAILS is %s', async (_label, allowedEmails) => {
+			userinfoResponse = () =>
+				Response.json({ id: 'google-user-11', name: 'Anyone', email: 'anyone@elsewhere.com' })
+
+			const response = await callback(
+				{ state: validState, code: 'google-code' },
+				allowedEmails === undefined ? testEnv() : testEnv({ ALLOWED_EMAILS: allowedEmails }),
+			)
+
+			expect(response.status).toBe(302)
+			expect(completeAuthorization).toHaveBeenCalledOnce()
+		})
+
+		// The two gates apply in the order they sit in the file — the domain first, then the
+		// list — and each refusal keeps its own message, which is how an operator tells which
+		// gate turned a user away.
+		describe('together with HOSTED_DOMAIN', () => {
+			it('refuses a listed address outside the hosted domain, with the domain message', async () => {
+				userinfoResponse = () =>
+					Response.json({ id: 'google-user-12', name: 'Grace', email: 'grace@elsewhere.com' })
+
+				const response = await callback(
+					{ state: validState, code: 'google-code' },
+					testEnv({ HOSTED_DOMAIN: 'example.com', ALLOWED_EMAILS: 'grace@elsewhere.com' }),
+				)
+
+				expect(response.status).toBe(403)
+				await expect(response.text()).resolves.toBe(
+					'Access restricted to example.com domain users only',
+				)
+				expect(completeAuthorization).not.toHaveBeenCalled()
+			})
+
+			it('refuses an in-domain address the list does not name', async () => {
+				userinfoResponse = () =>
+					Response.json({ id: 'google-user-13', name: 'Mallory', email: 'mallory@example.com' })
+
+				const response = await callback(
+					{ state: validState, code: 'google-code' },
+					testEnv({ HOSTED_DOMAIN: 'example.com', ALLOWED_EMAILS: 'ada@example.com' }),
+				)
+
+				expect(response.status).toBe(403)
+				await expect(response.text()).resolves.toBe('This account is not authorized')
+				expect(completeAuthorization).not.toHaveBeenCalled()
+			})
+
+			it('admits an in-domain address the list names', async () => {
+				const response = await callback(
+					{ state: validState, code: 'google-code' },
+					testEnv({ HOSTED_DOMAIN: 'example.com', ALLOWED_EMAILS: 'ada@example.com' }),
+				)
+
+				expect(response.status).toBe(302)
+				expect(completeAuthorization).toHaveBeenCalledOnce()
+			})
+		})
+	})
+
 	it('completes the authorization and redirects the client back to its own callback', async () => {
 		const response = await callback({ state: validState, code: 'google-code' })
 

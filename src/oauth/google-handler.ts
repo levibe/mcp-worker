@@ -58,6 +58,17 @@ export interface GoogleHandlerSecrets {
 	GOOGLE_CLIENT_ID: string
 	GOOGLE_CLIENT_SECRET: string
 	HOSTED_DOMAIN?: string
+	/**
+	 * Comma-separated exact addresses admitted at the OAuth callback; unset or blank admits
+	 * anyone. Entries are trimmed, empty ones dropped, and the comparison is case-insensitive
+	 * equality on the whole address.
+	 *
+	 * The knob exists for consumers whose authorized users are not on a single hosted domain.
+	 * A gmail.com address shares its domain with every personal Google account, so
+	 * HOSTED_DOMAIN cannot admit one such user without admitting them all — restriction has
+	 * to be by exact address. When both are set, a sign-in must clear both checks.
+	 */
+	ALLOWED_EMAILS?: string
 }
 
 /** The Hono app's actual bindings: the secrets plus the provider's injected helpers. */
@@ -351,6 +362,30 @@ export const createGoogleHandler = (options: GoogleHandlerOptions) => {
 		const hostedDomain = c.env.HOSTED_DOMAIN?.toLowerCase()
 		if (hostedDomain && !email.toLowerCase().endsWith(`@${hostedDomain}`)) {
 			return c.text(`Access restricted to ${c.env.HOSTED_DOMAIN} domain users only`, 403)
+		}
+
+		// Enforce the exact-address allowlist if ALLOWED_EMAILS is set.
+		//
+		// It runs after the domain check, so when both are set a sign-in has to clear both, the
+		// domain first. Entries are trimmed and empty ones dropped before the list is judged
+		// non-empty — a human edits this secret by hand, and a stray space or trailing comma
+		// must neither refuse everyone nor quietly admit the empty string. A value that is
+		// blank once parsed means no restriction, the same as unset.
+		//
+		// Both sides are lowercased for the same reason as the domain above: Google hands back
+		// a lowercase address in practice, and an access control should not rest on that habit.
+		// Here the comparison is equality on the whole address rather than a suffix, so there
+		// is no lookalike hazard for lowercasing to weaken.
+		//
+		// The refusal names no addresses, unlike the domain message above. A hosted domain is
+		// an organization's public name; this list is private addresses, and an unauthenticated
+		// caller does not get it echoed back.
+		const allowedEmails = (c.env.ALLOWED_EMAILS ?? '')
+			.split(',')
+			.map((entry) => entry.trim().toLowerCase())
+			.filter((entry) => entry !== '')
+		if (allowedEmails.length > 0 && !allowedEmails.includes(email.toLowerCase())) {
+			return c.text('This account is not authorized', 403)
 		}
 
 		// Return back to the MCP client a new token.
