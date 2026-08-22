@@ -51,7 +51,13 @@ The credential is a classic PAT with `read:packages`. The package is public, so 
       NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN }}
   ```
 
-- **Cloudflare Workers Builds**: there is no setup-node to lean on, so commit the credential reference as a separate file (say `.npmrc.build`) and set two build environment variables in the dashboard: `NPM_CONFIG_USERCONFIG` pointing at that file, and `GITHUB_PACKAGES_TOKEN` itself. Designating the file as user-level config is what makes pnpm willing to expand it. Both are build-time values, not runtime vars.
+- **Cloudflare Workers Builds**: three dashboard settings, all of them build-time values rather than runtime vars. Set `SKIP_DEPENDENCY_INSTALL=true` as a build variable, because Workers Builds otherwise runs its automatic dependency install before the build command executes, and that install 401s on this package before any credential could be configured (both deployed consumers hit exactly this on their first connected build). Set `GITHUB_PACKAGES_TOKEN` as a build secret rather than a plain build variable, so Workers Builds keeps the token masked in the build logs. Then have the build command authenticate and install itself, ahead of its deploy step:
+
+  ```sh
+  pnpm config set //npm.pkg.github.com/:_authToken "$GITHUB_PACKAGES_TOKEN" && pnpm install --frozen-lockfile
+  ```
+
+  `pnpm config set` writes the token into user-level config as a literal, so nothing depends on env-var expansion, and it is the same authenticate command the consumers' CI workflows run before their installs, so the two deploy paths cannot drift. The alternative, which avoids the skip variable: commit the credential reference as a separate file (say `.npmrc.build`) and set `NPM_CONFIG_USERCONFIG` pointing at that file alongside `GITHUB_PACKAGES_TOKEN`. Designating the file as user-level config is what makes pnpm willing to expand it, and the automatic install then authenticates by itself.
 
 ## Quick start
 
