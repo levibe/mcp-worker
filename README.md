@@ -81,7 +81,7 @@ export default createMcpWorker<Env, MyClient>({
 
 The factory owns two invariants that fail silently under local testing and loudly under load: the `McpServer` and the client are rebuilt for every request, and the withheld-tools announcement runs once per isolate from inside `fetch`. Do not reconstruct this wiring by hand to save a dependency; the doc comment on `createMcpWorker` explains what goes wrong.
 
-Defaults a deployment can override, each documented on `McpWorkerOptions`: `route` (`/mcp`, or an array to mount the endpoint on several paths at once — `['/mcp', '/']` also answers at a bare subdomain root, though the bare root works only for clients you drive yourself and not for Claude's hosted connector, which needs the `/mcp` URL; the doc comment on `route` explains why), `refreshTokenTTL` (90 days; a risk-posture decision, so state your own number when your deployment has its own argument), `clientRegistrationTTL` (400 days), `cacheHints` (five minutes on `tools/list`), and `allowedOriginHostnames` (widen browser origins one hostname at a time, never with a wildcard).
+Defaults a deployment can override, each documented on `McpWorkerOptions`: `route` (`/mcp`, or an array to mount the endpoint on several paths at once — `['/mcp', '/']` also answers at a bare subdomain root, though the bare root works only for clients you drive yourself and not for Claude's hosted connector, which needs the `/mcp` URL; the doc comment on `route` explains why), `refreshTokenTTL` (90 days; a risk-posture decision, so state your own number when your deployment has its own argument), `clientRegistrationTTL` (400 days), `cacheHints` (five minutes on `tools/list`), `allowedOriginHostnames` (widen browser origins one hostname at a time, never with a wildcard), and `requireAllowedEmails` (off; when true, a blank or unset `ALLOWED_EMAILS` refuses every sign-in instead of admitting anyone — state it on a deployment whose tools are not for strangers).
 
 ## The companion env.d.ts
 
@@ -95,6 +95,8 @@ interface Env {
 	COOKIE_ENCRYPTION_KEY: string
 	// Optional: restricts Google sign-in to a single hosted domain.
 	HOSTED_DOMAIN?: string
+	// Optional: restricts Google sign-in to a comma-separated list of exact addresses.
+	ALLOWED_EMAILS?: string
 }
 ```
 
