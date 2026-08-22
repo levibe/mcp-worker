@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-22
+
 ### Added
 
 - Optional `ALLOWED_EMAILS` secret on `GoogleHandlerSecrets`: comma-separated exact addresses admitted at the OAuth callback, compared case-insensitively with whitespace around entries tolerated. Unset or blank admits anyone; when `HOSTED_DOMAIN` is also set, both checks apply.
