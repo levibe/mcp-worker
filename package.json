@@ -1,6 +1,6 @@
 {
 	"name": "@levibe/mcp-worker",
-	"version": "0.3.0",
+	"version": "0.4.0",
 	"description": "Shared MCP server infrastructure for Cloudflare Workers: tool registry with reach-level ceilings, a retrying fetch transport, and Google OAuth for MCP clients",
 	"keywords": [
 		"cloudflare-workers",
