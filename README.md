@@ -51,7 +51,7 @@ The credential is a classic PAT with `read:packages`. The package is public, so 
       NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN }}
   ```
 
-- **Cloudflare Workers Builds**: three dashboard settings, all of them build-time values rather than runtime vars. Set `SKIP_DEPENDENCY_INSTALL=true` as a build variable, because Workers Builds otherwise runs its automatic dependency install before the build command executes, and that install 401s on this package before any credential could be configured (both deployed consumers hit exactly this on their first connected build). Set `GITHUB_PACKAGES_TOKEN` as a second build variable. Then have the build command authenticate and install itself, ahead of its deploy step:
+- **Cloudflare Workers Builds**: three dashboard settings, all of them build-time values rather than runtime vars. Set `SKIP_DEPENDENCY_INSTALL=true` as a build variable, because Workers Builds otherwise runs its automatic dependency install before the build command executes, and that install 401s on this package before any credential could be configured (both deployed consumers hit exactly this on their first connected build). Set `GITHUB_PACKAGES_TOKEN` as a build secret rather than a plain build variable, so Workers Builds keeps the token masked in the build logs. Then have the build command authenticate and install itself, ahead of its deploy step:
 
   ```sh
   pnpm config set //npm.pkg.github.com/:_authToken "$GITHUB_PACKAGES_TOKEN" && pnpm install --frozen-lockfile
