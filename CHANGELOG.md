@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-08-24
+
 ### Fixed
 
 - `HttpClient` resolves an empty 204 that carries a JSON content type (Google's answer when a `fields` mask leaves nothing) to a bare success instead of failing it as invalid JSON.
