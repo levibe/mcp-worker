@@ -180,6 +180,16 @@ describe('request', () => {
 		await expect(http.request('DELETE', '/tickets/42.json')).resolves.toEqual({ success: true })
 	})
 
+	it('answers an empty 204 with a bare success even when it claims to be JSON', async () => {
+		// Google's APIs do this when a `fields` mask leaves nothing to return.
+		stubFetch(
+			async () =>
+				new Response(null, { status: 204, headers: { 'content-type': 'application/json' } }),
+		)
+
+		await expect(http.request('GET', '/threads')).resolves.toEqual({ success: true })
+	})
+
 	it('turns a non-2xx into an error carrying the status and the body', async () => {
 		stubFetch(async () => failedResponse(404, '{"error":"RecordNotFound"}'))
 
