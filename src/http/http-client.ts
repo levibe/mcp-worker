@@ -393,6 +393,13 @@ export class HttpClient {
 				)
 			}
 
+			// A 204 has no body by definition, whatever content type rides along with it.
+			// Google's APIs send `application/json` on an empty 204 when a `fields` mask leaves
+			// nothing to return, and parsing that would fail a response that succeeded.
+			if (response.status === 204) {
+				return { success: true }
+			}
+
 			// A success without a JSON content type has no body worth parsing. An empty DELETE
 			// is the case that matters, since it answers with no content type at all.
 			const contentType = response.headers.get('content-type')
