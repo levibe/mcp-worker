@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- RFC 9728 protected-resource metadata is served only for the routes the worker mounts; every other path under `/.well-known/oauth-protected-resource` answers 404, the path-less document included. It advertised the bare origin, so a client discovering through it minted a grant whose RFC 8707 resource named a URL the worker serves nothing at. Mount `/` as a route and the path-less document is served again, because there it is true.
+
 ## [0.4.1] - 2026-08-24
 
 ### Fixed

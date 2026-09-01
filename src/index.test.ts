@@ -12,7 +12,16 @@ import { createMcpHandler } from 'agents/mcp/server'
 import { createMcpWorker, type McpWorkerOptions } from './index'
 import { toolFactory } from './registry/tool-registry'
 
-vi.mock('@cloudflare/workers-oauth-provider', () => ({ default: vi.fn() }))
+// The factory subclasses the provider to scope the protected-resource metadata to the routes it
+// mounts, so the mock has to be constructible and carry a `fetch` on its prototype for `super.fetch`
+// to resolve. The constructor is still a spy, so the config it was handed is still readable, and
+// the delegated response is identifiable by its body — which is how the tests below tell a request
+// the factory passed through from one it answered itself.
+vi.mock('@cloudflare/workers-oauth-provider', () => {
+	const Provider = vi.fn()
+	Provider.prototype.fetch = vi.fn(async () => new Response('delegated'))
+	return { default: Provider }
+})
 vi.mock('agents/mcp/server', () => ({ createMcpHandler: vi.fn() }))
 
 type StubClient = { readonly kind: 'stub' }
@@ -240,5 +249,85 @@ describe('the route and the origin allowlist', () => {
 			Record<string, unknown>,
 		]
 		expect('allowedOriginHostnames' in handlerOptions).toBe(false)
+	})
+})
+
+/**
+ * The provider serves an RFC 9728 document at every path under the well-known prefix, deriving the
+ * `resource` it advertises from the path it was asked at — so left alone it advertises the bare
+ * origin at the path-less URL, a resource a worker mounted only at '/mcp' serves nothing at. These
+ * pin the scoping that stops that: a document is served for a mounted route and refused everywhere
+ * else, and everything that is not a metadata request reaches the provider untouched.
+ */
+describe('the protected-resource metadata', () => {
+	const request = (
+		path: string,
+		over: Partial<McpWorkerOptions<StubEnv, StubClient>> = {},
+		headers: Record<string, string> = {},
+	) =>
+		createMcpWorker(workerOptions(over)).fetch(
+			new Request(`http://localhost${path}`, { headers }),
+			env,
+			{} as ExecutionContext,
+		)
+
+	it('refuses the path-less document, which names a resource nothing is mounted at', async () => {
+		const response = await request('/.well-known/oauth-protected-resource')
+
+		expect(response.status).toBe(404)
+	})
+
+	it('refuses it with a trailing slash too, which names the same bare origin', async () => {
+		const response = await request('/.well-known/oauth-protected-resource/')
+
+		expect(response.status).toBe(404)
+	})
+
+	it('serves the document for the route it does mount', async () => {
+		const response = await request('/.well-known/oauth-protected-resource/mcp')
+
+		expect(await response.text()).toBe('delegated')
+	})
+
+	// A deployment that mounts the root really does serve the bare origin, so the document naming
+	// it is honest there — the refusal is about what is mounted, not about the path-less shape.
+	it('serves the path-less document when the origin is itself a mounted route', async () => {
+		const response = await request('/.well-known/oauth-protected-resource', {
+			route: ['/mcp', '/'],
+		})
+
+		expect(await response.text()).toBe('delegated')
+	})
+
+	it('follows the configured route rather than a hardcoded /mcp', async () => {
+		const served = await request('/.well-known/oauth-protected-resource/api/mcp', {
+			route: '/api/mcp',
+		})
+		const refused = await request('/.well-known/oauth-protected-resource/mcp', {
+			route: '/api/mcp',
+		})
+
+		expect(await served.text()).toBe('delegated')
+		expect(refused.status).toBe(404)
+	})
+
+	it('leaves every other request to the provider', async () => {
+		const response = await request('/authorize')
+
+		expect(await response.text()).toBe('delegated')
+	})
+
+	// Without the echo a browser client reads a CORS failure rather than the 404 the server sent,
+	// which is a worse answer to the same question.
+	it('echoes the Origin on the refusal, and sends no CORS header without one', async () => {
+		const withOrigin = await request(
+			'/.well-known/oauth-protected-resource',
+			{},
+			{ Origin: 'https://app.example.com' },
+		)
+		const withoutOrigin = await request('/.well-known/oauth-protected-resource')
+
+		expect(withOrigin.headers.get('Access-Control-Allow-Origin')).toBe('https://app.example.com')
+		expect(withoutOrigin.headers.get('Access-Control-Allow-Origin')).toBeNull()
 	})
 })
