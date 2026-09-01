@@ -215,18 +215,36 @@ export const createMcpWorker = <TEnv extends GoogleHandlerSecrets, C>(
 	 * The provider's own `resourceMetadata.resource` is not the lever. It is one static string
 	 * applied to both documents, so it cannot say "origin here, endpoint there", and it would have
 	 * to carry a hostname this package never sees — the origin is only known per request.
+	 *
+	 * One dead end is accepted knowingly. The provider derives the 401's `resource_metadata`
+	 * pointer from the request pathname rather than the matched route, so an unauthenticated
+	 * request to a subpath like '/mcp/' is pointed at a document this class refuses. Serving that
+	 * document anyway would advertise a resource the worker does not serve — the endpoint
+	 * exact-matches its route, so '/mcp/' 404s once authenticated — which is the defect this class
+	 * exists to remove. The pointer misleads either way; refusing keeps the metadata honest.
 	 */
 	class RouteScopedMetadataProvider extends OAuthProvider<TEnv> {
 		override async fetch(request: Request, env: TEnv, ctx: ExecutionContext): Promise<Response> {
+			// OPTIONS is the provider's to answer even on a refused path: a browser preflights the
+			// GET (the MCP auth spec's MCP-Protocol-Version header is not safelisted), and a
+			// preflight must succeed for the GET to be sent at all — refuse it and the client reads
+			// an opaque CORS failure instead of the 404 the GET would have received.
 			const resourcePath = metadataResourcePath(new URL(request.url).pathname)
-			if (resourcePath !== null && !routes.includes(resourcePath)) {
+			if (resourcePath !== null && !routes.includes(resourcePath) && request.method !== 'OPTIONS') {
 				// The provider echoes the Origin on the documents it does serve, so the refusal echoes
 				// it too: without that a browser client reads a CORS failure instead of the 404 the
-				// server actually sent.
+				// server actually sent. The refusal must not outlive a config change that mounts the
+				// route, and the echo varies by requester — so no-store, matching the provider's own
+				// error responses, and Vary: Origin.
 				const origin = request.headers.get('Origin')
 				return new Response(`No MCP endpoint is served at ${resourcePath}`, {
 					status: 404,
-					headers: origin === null ? {} : { 'Access-Control-Allow-Origin': origin },
+					headers: {
+						'Cache-Control': 'no-store',
+						Pragma: 'no-cache',
+						Vary: 'Origin',
+						...(origin === null ? {} : { 'Access-Control-Allow-Origin': origin }),
+					},
 				})
 			}
 

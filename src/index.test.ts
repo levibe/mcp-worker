@@ -82,8 +82,10 @@ const fetchOnce = (route = '/mcp') =>
 beforeEach(() => {
 	// restoreMocks in vitest.config.ts does not reach mocks created inside a vi.mock factory,
 	// so their call history would accumulate across tests and providerConfig() would read the
-	// first test's config forever. Cleared by hand for that reason.
+	// first test's config forever. Cleared by hand for that reason — the prototype fetch
+	// included, so a future assertion on delegation is not order-dependent.
 	providerMock.mockClear()
+	vi.mocked(OAuthProvider.prototype.fetch).mockClear()
 	handlerMock.mockClear()
 	servers = []
 	// The mock plays the one part of the real handler this file depends on: it invokes the
@@ -275,6 +277,8 @@ describe('the protected-resource metadata', () => {
 		const response = await request('/.well-known/oauth-protected-resource')
 
 		expect(response.status).toBe(404)
+		// A cached refusal would outlive a config change that mounts '/', so it is uncacheable.
+		expect(response.headers.get('Cache-Control')).toBe('no-store')
 	})
 
 	it('refuses it with a trailing slash too, which names the same bare origin', async () => {
@@ -328,6 +332,25 @@ describe('the protected-resource metadata', () => {
 		const withoutOrigin = await request('/.well-known/oauth-protected-resource')
 
 		expect(withOrigin.headers.get('Access-Control-Allow-Origin')).toBe('https://app.example.com')
+		// The echo varies by requester, so a shared cache must not replay one origin's answer to
+		// another.
+		expect(withOrigin.headers.get('Vary')).toBe('Origin')
 		expect(withoutOrigin.headers.get('Access-Control-Allow-Origin')).toBeNull()
+	})
+
+	// A browser preflights the GET (the MCP auth spec's MCP-Protocol-Version header is not
+	// safelisted), and a preflight must succeed for the GET to be sent at all — so OPTIONS reaches
+	// the provider even on a refused path, and the refusal itself arrives on the GET.
+	it('leaves OPTIONS preflights to the provider even on a refused path', async () => {
+		const response = await createMcpWorker(workerOptions()).fetch(
+			new Request('http://localhost/.well-known/oauth-protected-resource', {
+				method: 'OPTIONS',
+				headers: { Origin: 'https://app.example.com', 'Access-Control-Request-Method': 'GET' },
+			}),
+			env,
+			{} as ExecutionContext,
+		)
+
+		expect(await response.text()).toBe('delegated')
 	})
 })
