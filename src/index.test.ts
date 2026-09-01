@@ -12,7 +12,16 @@ import { createMcpHandler } from 'agents/mcp/server'
 import { createMcpWorker, type McpWorkerOptions } from './index'
 import { toolFactory } from './registry/tool-registry'
 
-vi.mock('@cloudflare/workers-oauth-provider', () => ({ default: vi.fn() }))
+// The factory subclasses the provider to scope the protected-resource metadata to the routes it
+// mounts, so the mock has to be constructible and carry a `fetch` on its prototype for `super.fetch`
+// to resolve. The constructor is still a spy, so the config it was handed is still readable, and
+// the delegated response is identifiable by its body — which is how the tests below tell a request
+// the factory passed through from one it answered itself.
+vi.mock('@cloudflare/workers-oauth-provider', () => {
+	const Provider = vi.fn()
+	Provider.prototype.fetch = vi.fn(async () => new Response('delegated'))
+	return { default: Provider }
+})
 vi.mock('agents/mcp/server', () => ({ createMcpHandler: vi.fn() }))
 
 type StubClient = { readonly kind: 'stub' }
@@ -73,8 +82,10 @@ const fetchOnce = (route = '/mcp') =>
 beforeEach(() => {
 	// restoreMocks in vitest.config.ts does not reach mocks created inside a vi.mock factory,
 	// so their call history would accumulate across tests and providerConfig() would read the
-	// first test's config forever. Cleared by hand for that reason.
+	// first test's config forever. Cleared by hand for that reason — the prototype fetch
+	// included, so a future assertion on delegation is not order-dependent.
 	providerMock.mockClear()
+	vi.mocked(OAuthProvider.prototype.fetch).mockClear()
 	handlerMock.mockClear()
 	servers = []
 	// The mock plays the one part of the real handler this file depends on: it invokes the
@@ -240,5 +251,106 @@ describe('the route and the origin allowlist', () => {
 			Record<string, unknown>,
 		]
 		expect('allowedOriginHostnames' in handlerOptions).toBe(false)
+	})
+})
+
+/**
+ * The provider serves an RFC 9728 document at every path under the well-known prefix, deriving the
+ * `resource` it advertises from the path it was asked at — so left alone it advertises the bare
+ * origin at the path-less URL, a resource a worker mounted only at '/mcp' serves nothing at. These
+ * pin the scoping that stops that: a document is served for a mounted route and refused everywhere
+ * else, and everything that is not a metadata request reaches the provider untouched.
+ */
+describe('the protected-resource metadata', () => {
+	const request = (
+		path: string,
+		over: Partial<McpWorkerOptions<StubEnv, StubClient>> = {},
+		headers: Record<string, string> = {},
+	) =>
+		createMcpWorker(workerOptions(over)).fetch(
+			new Request(`http://localhost${path}`, { headers }),
+			env,
+			{} as ExecutionContext,
+		)
+
+	it('refuses the path-less document, which names a resource nothing is mounted at', async () => {
+		const response = await request('/.well-known/oauth-protected-resource')
+
+		expect(response.status).toBe(404)
+		// A cached refusal would outlive a config change that mounts '/', so it is uncacheable.
+		expect(response.headers.get('Cache-Control')).toBe('no-store')
+	})
+
+	it('refuses it with a trailing slash too, which names the same bare origin', async () => {
+		const response = await request('/.well-known/oauth-protected-resource/')
+
+		expect(response.status).toBe(404)
+	})
+
+	it('serves the document for the route it does mount', async () => {
+		const response = await request('/.well-known/oauth-protected-resource/mcp')
+
+		expect(await response.text()).toBe('delegated')
+	})
+
+	// A deployment that mounts the root really does serve the bare origin, so the document naming
+	// it is honest there — the refusal is about what is mounted, not about the path-less shape.
+	it('serves the path-less document when the origin is itself a mounted route', async () => {
+		const response = await request('/.well-known/oauth-protected-resource', {
+			route: ['/mcp', '/'],
+		})
+
+		expect(await response.text()).toBe('delegated')
+	})
+
+	it('follows the configured route rather than a hardcoded /mcp', async () => {
+		const served = await request('/.well-known/oauth-protected-resource/api/mcp', {
+			route: '/api/mcp',
+		})
+		const refused = await request('/.well-known/oauth-protected-resource/mcp', {
+			route: '/api/mcp',
+		})
+
+		expect(await served.text()).toBe('delegated')
+		expect(refused.status).toBe(404)
+	})
+
+	it('leaves every other request to the provider', async () => {
+		const response = await request('/authorize')
+
+		expect(await response.text()).toBe('delegated')
+	})
+
+	// Without the echo a browser client reads a CORS failure rather than the 404 the server sent,
+	// which is a worse answer to the same question.
+	it('echoes the Origin on the refusal, and sends no CORS header without one', async () => {
+		const withOrigin = await request(
+			'/.well-known/oauth-protected-resource',
+			{},
+			{ Origin: 'https://app.example.com' },
+		)
+		const withoutOrigin = await request('/.well-known/oauth-protected-resource')
+
+		expect(withOrigin.headers.get('Access-Control-Allow-Origin')).toBe('https://app.example.com')
+		// The echo varies by requester, so a shared cache must not replay one origin's answer to
+		// another.
+		expect(withOrigin.headers.get('Vary')).toBe('Origin')
+		expect(withoutOrigin.headers.get('Access-Control-Allow-Origin')).toBeNull()
+	})
+
+	// A browser preflights the GET (the MCP auth spec's MCP-Protocol-Version header is not
+	// safelisted), and a preflight must succeed for the GET to be sent at all — so OPTIONS reaches
+	// the provider even on a refused path, and the refusal itself arrives on the GET.
+	it('leaves OPTIONS preflights to the provider even on a refused path', async () => {
+		const response = await createMcpWorker(workerOptions()).fetch(
+			new Request('http://localhost/.well-known/oauth-protected-resource', {
+				method: 'OPTIONS',
+				headers: { Origin: 'https://app.example.com', 'Access-Control-Request-Method': 'GET' },
+			}),
+			env,
+			{} as ExecutionContext,
+		)
+
+		expect(await response.text()).toBe('delegated')
 	})
 })

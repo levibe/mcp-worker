@@ -10,6 +10,24 @@ import { resolveCeilings, type ResolvedCeilings } from './registry/tool-ceilings
 // toolFactory and the level types, so it should not need a second import path to reach them.
 export * from './registry'
 
+/**
+ * RFC 9728 §3.1 builds a protected resource's metadata URL by inserting this segment between the
+ * authority and the resource's own path. So whatever follows the prefix is the path of the
+ * resource being asked about, and the path-less form asks about the bare origin.
+ */
+const PROTECTED_RESOURCE_METADATA = '/.well-known/oauth-protected-resource'
+
+/**
+ * Which resource a protected-resource metadata request is asking about, as a path, or null when
+ * the request is not one of these at all. Both the bare prefix and the prefix with a trailing
+ * slash name the origin itself, which is the '/' route.
+ */
+const metadataResourcePath = (pathname: string): string | null => {
+	if (pathname === PROTECTED_RESOURCE_METADATA) return '/'
+	if (!pathname.startsWith(`${PROTECTED_RESOURCE_METADATA}/`)) return null
+	return pathname.slice(PROTECTED_RESOURCE_METADATA.length)
+}
+
 export interface McpWorkerOptions<TEnv extends GoogleHandlerSecrets, C> {
 	/** Passed to `new McpServer(...)` — rebuilt per request, never hoisted, by construction. */
 	server: { name: string; version: string; description?: string }
@@ -176,7 +194,65 @@ export const createMcpWorker = <TEnv extends GoogleHandlerSecrets, C>(
 		},
 	})
 
-	return new OAuthProvider({
+	/**
+	 * The provider answers a protected-resource metadata request at every path under the well-known
+	 * prefix, deriving the `resource` it advertises from the path it was asked at — so
+	 * `/.well-known/oauth-protected-resource` advertises the bare origin whether or not an MCP
+	 * endpoint is mounted there. That is how a client configured with the '/mcp' URL ends up holding
+	 * a grant whose RFC 8707 resource is the origin: it discovered through the path-less document
+	 * and believed it. Nothing visibly breaks while requests still go to the configured URL, but the
+	 * token audience is wrong, and a client that treats the advertised `resource` as the endpoint is
+	 * pointed at a URL this worker 404s.
+	 *
+	 * So the metadata is scoped to the routes actually mounted, and every other path under the
+	 * prefix is refused. Answering the path-less request with the canonical endpoint as its
+	 * `resource` is not open to us: RFC 9728 §3.3 requires the returned value to be identical to the
+	 * identifier the metadata URL was built from, and a client MUST NOT use a response where it is
+	 * not — so a conforming client would discard that document, and only the clients that caused
+	 * this would accept it. Refusing costs no discovery either, because the 401 from the endpoint
+	 * names the right document in `WWW-Authenticate`.
+	 *
+	 * The provider's own `resourceMetadata.resource` is not the lever. It is one static string
+	 * applied to both documents, so it cannot say "origin here, endpoint there", and it would have
+	 * to carry a hostname this package never sees — the origin is only known per request.
+	 *
+	 * One dead end is accepted knowingly. The provider derives the 401's `resource_metadata`
+	 * pointer from the request pathname rather than the matched route, so an unauthenticated
+	 * request to a subpath like '/mcp/' is pointed at a document this class refuses. Serving that
+	 * document anyway would advertise a resource the worker does not serve — the endpoint
+	 * exact-matches its route, so '/mcp/' 404s once authenticated — which is the defect this class
+	 * exists to remove. The pointer misleads either way; refusing keeps the metadata honest.
+	 */
+	class RouteScopedMetadataProvider extends OAuthProvider<TEnv> {
+		override async fetch(request: Request, env: TEnv, ctx: ExecutionContext): Promise<Response> {
+			// OPTIONS is the provider's to answer even on a refused path: a browser preflights the
+			// GET (the MCP auth spec's MCP-Protocol-Version header is not safelisted), and a
+			// preflight must succeed for the GET to be sent at all — refuse it and the client reads
+			// an opaque CORS failure instead of the 404 the GET would have received.
+			const resourcePath = metadataResourcePath(new URL(request.url).pathname)
+			if (resourcePath !== null && !routes.includes(resourcePath) && request.method !== 'OPTIONS') {
+				// The provider echoes the Origin on the documents it does serve, so the refusal echoes
+				// it too: without that a browser client reads a CORS failure instead of the 404 the
+				// server actually sent. The refusal must not outlive a config change that mounts the
+				// route, and the echo varies by requester — so no-store, matching the provider's own
+				// error responses, and Vary: Origin.
+				const origin = request.headers.get('Origin')
+				return new Response(`No MCP endpoint is served at ${resourcePath}`, {
+					status: 404,
+					headers: {
+						'Cache-Control': 'no-store',
+						Pragma: 'no-cache',
+						Vary: 'Origin',
+						...(origin === null ? {} : { 'Access-Control-Allow-Origin': origin }),
+					},
+				})
+			}
+
+			return super.fetch(request, env, ctx)
+		}
+	}
+
+	return new RouteScopedMetadataProvider({
 		apiHandlers: Object.fromEntries(routes.map((r) => [r, makeMcpHandler(r)])),
 		authorizeEndpoint: '/authorize',
 		clientRegistrationEndpoint: '/register',

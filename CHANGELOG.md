@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- RFC 9728 protected-resource metadata is served only for the routes the worker mounts; every other path under `/.well-known/oauth-protected-resource`, the path-less document included, answers 404. A deployment that mounts `/` still gets the path-less document.
+
 ## [0.4.1] - 2026-08-24
 
 ### Fixed
